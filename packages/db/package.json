@@ -1,0 +1,17 @@
+{
+  "name": "@weight-tracker/db",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@weight-tracker/domain": "workspace:*",
+    "drizzle-orm": "0.45.4",
+    "postgres": "4.1.0"
+  }
+}

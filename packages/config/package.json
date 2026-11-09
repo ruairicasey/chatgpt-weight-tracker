@@ -1,0 +1,16 @@
+{
+  "name": "@weight-tracker/config",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@weight-tracker/contracts": "workspace:*",
+    "zod": "4.6.7"
+  }
+}

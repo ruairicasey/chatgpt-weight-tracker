@@ -1,0 +1,11 @@
+packages:
+  - apps/*
+  - packages/*
+allowBuilds:
+  esbuild: true
+  sharp: true
+  unrs-resolver: true
+# Upstream lint tooling still requests older majors affected by GHSA-g3hv-75wg-m249.
+# Exercise the patched version through the complete lint/type/build suite.
+overrides:
+  'minimatch@>=7.0.0 <11.0.1': 11.0.5
