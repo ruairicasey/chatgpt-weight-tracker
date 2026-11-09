@@ -41,6 +41,9 @@ importers:
       eslint:
         specifier: 10.14.0
         version: 10.14.0(supports-color@7.2.0)
+      jose:
+        specifier: 6.2.15
+        version: 6.2.15
       tsx:
         specifier: 4.23.15
         version: 4.23.15
@@ -75,15 +78,27 @@ importers:
 
   packages/auth:
     dependencies:
+      '@weight-tracker/config':
+        specifier: workspace:*
+        version: link:../config
       '@weight-tracker/contracts':
         specifier: workspace:*
         version: link:../contracts
+      jose:
+        specifier: 6.2.15
+        version: 6.2.15
+      server-only:
+        specifier: 0.0.1
+        version: 0.0.1
 
   packages/config:
     dependencies:
       '@weight-tracker/contracts':
         specifier: workspace:*
         version: link:../contracts
+      server-only:
+        specifier: 0.0.1
+        version: 0.0.1
       zod:
         specifier: 4.6.7
         version: 4.6.7
@@ -1084,6 +1099,9 @@ packages:
   isexe@2.0.0:
     resolution: {integrity: sha512-RHxMLp9lnKHGHRng9QFhRCMbYAcVpn69smSGcq3f36xjgVVWThj4qqLbTLlq7Ssj8B+fIQ1EuCEGI2lKsyQeIw==}
 
+  jose@6.2.15:
+    resolution: {integrity: sha512-qdF6ewcZARtef63fJ9AKKZPgxw+t7USH6HLXYcD4CrdmSvDp79rpJSPFEKc90QBeGS63u1KQtN2MZQHC0yDIzA==}
+
   js-tokens@4.0.0:
     resolution: {integrity: sha512-RdJUflcE3cUzKiMqQgsCu06FPu9UdIJO0beYbPhHN4k6apgJtifcoCtT9bcxOpYBtpD2kCM6Sbzg4CausW/PKQ==}
 
@@ -1256,6 +1274,9 @@ packages:
     resolution: {integrity: sha512-9lpSSU4Mly3mrtruwLs1eLK6+gzbzqeBFwRNjIjE+9LuDpWdYctrQlQ3ej1Ilgi7gknpsTRnPoLP8DpCHqHIJw==}
     engines: {node: '>=10'}
     hasBin: true
+
+  server-only@0.0.1:
+    resolution: {integrity: sha512-qepMx2JxAa5jjfzxG79yPPq+8BuFToHd1hm7kI+Z4zAq1ftQiP7HcxMhDDItrbtwVeLg/cY2JnKnrcFkmiswNA==}
 
   sharp@0.35.5:
     resolution: {integrity: sha512-Ywn4OnzGukp7CDMrp08RQ50YKmuwG47brZgIVPTvBaaAfQlRlygrRqSrxdCiL9M+LlzLBiJ68IR1QqvzHyjC7g==}
@@ -2192,6 +2213,8 @@ snapshots:
 
   isexe@2.0.0: {}
 
+  jose@6.2.15: {}
+
   js-tokens@4.0.0:
     optional: true
 
@@ -2340,6 +2363,8 @@ snapshots:
     optional: true
 
   semver@7.8.6: {}
+
+  server-only@0.0.1: {}
 
   sharp@0.35.5(@types/node@24.10.0):
     dependencies:

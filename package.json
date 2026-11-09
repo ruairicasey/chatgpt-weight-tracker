@@ -1,6 +1,7 @@
 {
   "name": "chatgpt-weight-tracker",
   "private": true,
+  "type": "module",
   "version": "0.1.0",
   "packageManager": "pnpm@11.25.0",
   "engines": {
@@ -13,11 +14,14 @@
     "boundaries": "tsx scripts/check-boundaries.ts",
     "lint": "eslint .",
     "typecheck": "pnpm -r typecheck && tsc --project tsconfig.test.json",
-    "test": "tsx --test tests/*.test.ts",
+    "test": "tsx --conditions=react-server --test tests/*.test.ts",
     "test:e2e": "playwright test",
-    "check": "pnpm boundaries && pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm test:e2e"
+    "test:build-security": "tsx scripts/check-client-bundles.ts",
+    "check": "pnpm boundaries && pnpm lint && pnpm typecheck && pnpm test && pnpm test:build-security && pnpm test:e2e"
   },
   "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@next/eslint-plugin-next": "16.4.5",
     "@playwright/test": "1.65.0",
     "@types/node": "24.10.0",
     "@weight-tracker/auth": "workspace:*",
@@ -26,10 +30,9 @@
     "@weight-tracker/db": "workspace:*",
     "@weight-tracker/domain": "workspace:*",
     "eslint": "10.14.0",
+    "jose": "6.2.15",
     "tsx": "4.23.15",
     "typescript": "5.9.3",
-    "typescript-eslint": "8.72.1",
-    "@next/eslint-plugin-next": "16.4.5",
-    "@eslint/js": "10.0.1"
+    "typescript-eslint": "8.72.1"
   }
 }

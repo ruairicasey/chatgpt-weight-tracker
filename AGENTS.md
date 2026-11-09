@@ -22,6 +22,12 @@ infrastructure, deploy, configure credentials, enable OAuth/database connections
 implement tracker features or merge PRs without the corresponding authorization.
 Opening a requested feature PR is authorized; merging it is not.
 
+Phase 1B.1 separately authorizes server-only OAuth configuration, JWT verification,
+owner/scope authorization, secure errors, synthetic tests and documentation only.
+Keep `/mcp` unconditionally disabled and discovery absent. Phase 1B.2 transport,
+tools, external setup, credentials and deployment require separate approval.
+See docs/phase-1b1-authentication.md. No trial entitlement may be treated as Free.
+
 ## Security and privacy
 
 - Never commit personal data, credentials, dumps, private screenshots or tokens.

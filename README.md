@@ -5,12 +5,16 @@ private PostgreSQL storage and a private web dashboard. **Additional operating
 cost must remain $0.** Only ongoing Free/Hobby plans are permitted; no trials,
 usage billing, paid domains, automatic upgrades or additional model APIs.
 
-## Current status: Phase 1A
+## Current status: Phase 1B.1
 
 This branch contains a credential-free monorepo foundation, not a working tracker.
 The Next.js landing shell is available locally. Login, persistence, food/weight/
-exercise features and OAuth are not implemented. `/mcp` explicitly returns 503
-and exposes no tools. Phase 1B needs separate approval.
+exercise features and hosted OAuth are not available. Server-only configuration,
+cryptographic JWT verification, owner/scope authorization and secure OAuth error
+helpers are implemented and tested locally. `/mcp` explicitly returns 503 and
+exposes no tools. Phase 1B.2 needs separate approval. See
+[ADR 002](docs/phase-1b1-authentication.md) for configuration/security details,
+Auth0 ongoing Free gates and the official SDK versus `mcp-handler` 2.x comparison.
 
 The owner verified unauthenticated read/write execution, idempotent replay and
 new-chat readback on their ChatGPT Plus account during Phase 0. OAuth and durable
@@ -54,8 +58,9 @@ Individual checks:
 | `pnpm boundaries` | Package graph, client/server imports and Phase 0 isolation |
 | `pnpm lint` | Next.js/TypeScript ESLint rules |
 | `pnpm typecheck` | Strict workspace typing and negative principal assertions |
-| `pnpm test` | Synthetic contract, cost-policy and boundary regression tests |
+| `pnpm test` | Synthetic contracts, local JWT crypto, configuration, authorization and boundary regressions |
 | `pnpm build` | Next.js production build, local only |
+| `pnpm test:build-security` | Production build with synthetic secret canaries and browser artifact leak scan |
 | `pnpm test:e2e` | Built app, desktop/mobile shell and disabled MCP HTTP behavior |
 | `pnpm audit` | Registry dependency advisory check; not part of deterministic tests |
 
@@ -76,15 +81,15 @@ and have read-only repository permissions.
 | --- | --- |
 | `apps/web` | Next.js App Router shell and disabled MCP entry point |
 | `packages/contracts` | Zod contracts, identifiers, error/scope vocabulary |
-| `packages/config` | Explicit zero-cost policy configuration validation |
-| `packages/auth` | Opaque verified principal types; future verifier/resolver ports |
+| `packages/config` | Cost policy plus explicit server-only OAuth environment validation |
+| `packages/auth` | Principal types plus server-only JWT verification and owner/scope resolution |
 | `packages/domain` | Use-case/transaction boundaries; no tracker implementations |
 | `packages/db` | Drizzle/Postgres types only; no connection or migrations |
 | `references/phase0` | Original disposable probe, excluded from active workspace/build |
 
 Shared packages are private source packages, not published npm packages. No
 production source may import the reference. Principal brands do not verify a JWT;
-only the future trusted verifier/resolver may establish authenticated ownership.
+only the trusted server verifier/resolver may establish authenticated ownership.
 
 ## Planned hosting and boundaries
 
