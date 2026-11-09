@@ -147,3 +147,13 @@ vite.config.ts.timestamp-*
 
 # Turbo Repo
 .turbo
+
+# Local tooling, browser evidence and private backups
+playwright-report/
+test-results/
+.vercel/
+backups/
+*.dump
+*.sql.gz
+*.age
+**/next-env.d.ts

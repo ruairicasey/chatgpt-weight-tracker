@@ -1,0 +1,35 @@
+{
+  "name": "chatgpt-weight-tracker",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@11.25.0",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @weight-tracker/web dev",
+    "build": "pnpm --filter @weight-tracker/web build",
+    "start": "pnpm --filter @weight-tracker/web start",
+    "boundaries": "tsx scripts/check-boundaries.ts",
+    "lint": "eslint .",
+    "typecheck": "pnpm -r typecheck && tsc --project tsconfig.test.json",
+    "test": "tsx --test tests/*.test.ts",
+    "test:e2e": "playwright test",
+    "check": "pnpm boundaries && pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm test:e2e"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.65.0",
+    "@types/node": "24.10.0",
+    "@weight-tracker/auth": "workspace:*",
+    "@weight-tracker/config": "workspace:*",
+    "@weight-tracker/contracts": "workspace:*",
+    "@weight-tracker/db": "workspace:*",
+    "@weight-tracker/domain": "workspace:*",
+    "eslint": "10.14.0",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.72.1",
+    "@next/eslint-plugin-next": "16.4.5",
+    "@eslint/js": "10.0.1"
+  }
+}
