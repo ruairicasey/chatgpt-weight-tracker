@@ -5,16 +5,21 @@ private PostgreSQL storage and a private web dashboard. **Additional operating
 cost must remain $0.** Only ongoing Free/Hobby plans are permitted; no trials,
 usage billing, paid domains, automatic upgrades or additional model APIs.
 
-## Current status: Phase 1B.1
+## Current status: Phase 1B.2 (disabled by default)
 
 This branch contains a credential-free monorepo foundation, not a working tracker.
 The Next.js landing shell is available locally. Login, persistence, food/weight/
 exercise features and hosted OAuth are not available. Server-only configuration,
 cryptographic JWT verification, owner/scope authorization and secure OAuth error
-helpers are implemented and tested locally. `/mcp` explicitly returns 503 and
-exposes no tools. Phase 1B.2 needs separate approval. See
+helpers are implemented and tested locally. The official SDK v2 MCP adapter and
+two authenticated synthetic probes are implemented but disabled by default:
+`/mcp` and OAuth resource metadata return 503 without complete configuration,
+explicit activation and an unexpired deadline. No hosted OAuth has been tested.
+Deployment and ChatGPT connection require separate approval. See
 [ADR 002](docs/phase-1b1-authentication.md) for configuration/security details,
 Auth0 ongoing Free gates and the official SDK versus `mcp-handler` 2.x comparison.
+Read [Phase 1B.2 and the manual acceptance runbook](docs/phase-1b2-mcp.md)
+for the pinned SDK API, protocol results, activation and temporary storage limits.
 
 The owner verified unauthenticated read/write execution, idempotent replay and
 new-chat readback on their ChatGPT Plus account during Phase 0. OAuth and durable
@@ -83,6 +88,7 @@ and have read-only repository permissions.
 | `packages/contracts` | Zod contracts, identifiers, error/scope vocabulary |
 | `packages/config` | Cost policy plus explicit server-only OAuth environment validation |
 | `packages/auth` | Principal types plus server-only JWT verification and owner/scope resolution |
+| `packages/mcp` | Server-only stateless SDK v2 adapter, activation gate and synthetic probes |
 | `packages/domain` | Use-case/transaction boundaries; no tracker implementations |
 | `packages/db` | Drizzle/Postgres types only; no connection or migrations |
 | `references/phase0` | Original disposable probe, excluded from active workspace/build |

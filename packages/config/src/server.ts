@@ -36,7 +36,7 @@ export function validateOAuthConfig(input: unknown): OAuthConfig {
 
 /** Explicit call only; no import-time environment access, defaults or credentials. */
 export function loadOAuthConfig(env: Readonly<Record<string, string | undefined>>): OAuthConfig {
-  if (Object.keys(env).some(key => key.startsWith('NEXT_PUBLIC_') && /AUTH0|MCP_OAUTH|MCP_OWNER/.test(key))) {
+  if (Object.keys(env).some(key => key.startsWith('NEXT_PUBLIC_') && /AUTH0|MCP_OAUTH|MCP_OWNER|MCP_EXPERIMENT/.test(key))) {
     throw new OAuthConfigurationError();
   }
   return validateOAuthConfig({
@@ -46,4 +46,15 @@ export function loadOAuthConfig(env: Readonly<Record<string, string | undefined>
     ownerSubject: env.MCP_OWNER_SUBJECT,
     ownerUserId: env.MCP_OWNER_USER_ID,
   });
+}
+
+export type McpExperimentConfig = Readonly<{ oauth: OAuthConfig; expiresAt: number }>;
+
+/** No default activation. A fixed UTC/offset deadline may be at most 24h away. */
+export function loadMcpExperimentConfig(env: Readonly<Record<string, string | undefined>>, now = Date.now()): McpExperimentConfig {
+  const expiry = z.iso.datetime({ offset: true }).safeParse(env.MCP_EXPERIMENT_EXPIRES_AT);
+  if (env.MCP_EXPERIMENT_ENABLED !== 'true' || !expiry.success) throw new OAuthConfigurationError();
+  const expiresAt = Date.parse(expiry.data);
+  if (!Number.isFinite(expiresAt) || expiresAt <= now || expiresAt - now > 86_400_000) throw new OAuthConfigurationError();
+  return Object.freeze({ oauth: loadOAuthConfig(env), expiresAt });
 }

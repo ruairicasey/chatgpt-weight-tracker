@@ -3,11 +3,11 @@ import { dirname, join, relative, resolve, sep } from 'node:path';
 import ts from 'typescript';
 
 const allowed: Readonly<Record<string, readonly string[]>> = {
-  web: ['contracts', 'config', 'auth', 'domain', 'db'],
+  web: ['contracts', 'config', 'auth', 'domain', 'db', 'mcp'],
   contracts: [], config: ['contracts'], auth: ['contracts', 'config'],
-  domain: ['auth', 'contracts'], db: ['domain'],
+  domain: ['auth', 'contracts'], db: ['domain'], mcp: ['auth', 'config', 'contracts'],
 };
-const serverPackages = new Set(['config', 'auth', 'domain', 'db']);
+const serverPackages = new Set(['config', 'auth', 'domain', 'db', 'mcp']);
 const namespace = '@weight-tracker/';
 
 type PackageInfo = { directory: string; shortName: string; dependencies: Set<string>; exports: Record<string, string> };

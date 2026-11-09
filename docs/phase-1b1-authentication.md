@@ -5,6 +5,10 @@ Status: implemented locally for review; no hosted OAuth integration. This extend
 Provider documentation reviewed on 2026-11-09. Free terms and client protocols
 must be rechecked before separately approved Phase 1B.2 work.
 
+Historical phase record: [Phase 1B.2](phase-1b2-mcp.md) now adds gated MCP routes
+and synthetic tools. Its activation/security boundary supersedes statements here
+about routes being absent or permanently disabled. Hosted OAuth remains unverified.
+
 ## Scope and authority
 
 This phase implements server-only configuration, verification, authorization and

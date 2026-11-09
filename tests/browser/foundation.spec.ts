@@ -23,6 +23,10 @@ test('MCP stays disabled even when a caller sends tokens, synthetic writes or fo
     expect(response.headers()['cache-control']).toBe('no-store');
     expect(await response.json()).toEqual({ error: 'INTEGRATION_NOT_CONFIGURED' });
   }
-  expect((await request.get('/.well-known/oauth-protected-resource')).status()).toBe(404);
-  expect((await request.get('/.well-known/oauth-protected-resource/mcp')).status()).toBe(404);
+  for (const path of ['/.well-known/oauth-protected-resource', '/.well-known/oauth-protected-resource/mcp']) {
+    const response = await request.get(path);
+    expect(response.status()).toBe(503);
+    expect(response.headers()['cache-control']).toBe('no-store');
+    expect(await response.json()).toEqual({ error: 'INTEGRATION_NOT_CONFIGURED' });
+  }
 });

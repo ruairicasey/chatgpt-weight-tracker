@@ -2,11 +2,11 @@ import 'server-only';
 import { decodeProtectedHeader, jwtVerify } from 'jose';
 import { validateOAuthConfig, type OAuthConfig } from '@weight-tracker/config/server';
 import { TrackerScopeSchema, UserIdSchema, type TrackerScope } from '@weight-tracker/contracts';
-import type { McpTokenVerifier, PrincipalResolver, VerifiedExternalIdentity, VerifiedPrincipal } from './index.js';
-import { AuthenticationError, bearerToken, checkedScopes } from './errors.js';
-import { trustedKeys } from './trusted-keys.js';
+import type { McpTokenVerifier, PrincipalResolver, VerifiedExternalIdentity, VerifiedPrincipal } from './index';
+import { AuthenticationError, bearerToken, checkedScopes } from './errors';
+import { trustedKeys } from './trusted-keys';
 
-export { AuthenticationError, bearerToken, oauthFailureResponse } from './errors.js';
+export { AuthenticationError, bearerToken, oauthFailureResponse } from './errors';
 
 /** A closure owns authentic identities; a type assertion or JSON copy cannot mint one. */
 export function createOwnerAuthentication(input: OAuthConfig, fetcher: typeof fetch = fetch): {

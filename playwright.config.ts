@@ -15,6 +15,7 @@ export default defineConfig({
     trace: 'off',
   },
   webServer: {
+    env: { MCP_EXPERIMENT_ENABLED: 'false' },
     command: 'pnpm --filter @weight-tracker/web start --hostname 127.0.0.1 --port 3100',
     url: 'http://127.0.0.1:3100',
     reuseExistingServer: false,

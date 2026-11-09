@@ -21,6 +21,7 @@
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
+    "@modelcontextprotocol/client": "2.4.0",
     "@next/eslint-plugin-next": "16.4.5",
     "@playwright/test": "1.65.0",
     "@types/node": "24.10.0",
@@ -29,6 +30,7 @@
     "@weight-tracker/contracts": "workspace:*",
     "@weight-tracker/db": "workspace:*",
     "@weight-tracker/domain": "workspace:*",
+    "@weight-tracker/mcp": "workspace:*",
     "eslint": "10.14.0",
     "jose": "6.2.15",
     "tsx": "4.23.15",

@@ -28,6 +28,14 @@ Keep `/mcp` unconditionally disabled and discovery absent. Phase 1B.2 transport,
 tools, external setup, credentials and deployment require separate approval.
 See docs/phase-1b1-authentication.md. No trial entitlement may be treated as Free.
 
+Phase 1B.2 separately authorizes the official SDK v2 stateless Fetch handler,
+protected-resource metadata and authenticated synthetic probes only. The
+experiment must default to disabled, require complete validated configuration
+and expire within 24 hours. Temporary bounded memory is permitted only for
+synthetic probes and must never be described as durable. No deployment, account
+creation, infrastructure, production credentials, Supabase integration or merge
+of the Phase 1B.2 PR is authorized. See docs/phase-1b2-mcp.md.
+
 ## Security and privacy
 
 - Never commit personal data, credentials, dumps, private screenshots or tokens.
