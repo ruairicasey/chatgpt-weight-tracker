@@ -40,7 +40,7 @@ pnpm test
 pnpm build
 
 echo "Starting disposable MCP process on 127.0.0.1:3000 (max 15 minutes)..."
-PROBE_TTL_SECONDS=900 pnpm start > "$WORKDIR/server.log" 2>&1 &
+PROBE_TTL_SECONDS=900 node dist/src/start.js > "$WORKDIR/server.log" 2>&1 &
 SERVER_PID=$!
 for i in {1..30}; do
   if ! kill -0 "$SERVER_PID" 2>/dev/null; then
