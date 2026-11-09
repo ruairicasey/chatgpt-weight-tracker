@@ -6,6 +6,11 @@ Update: [ADR 002](phase-1b1-authentication.md) records Phase 1B.1's implemented
 server-only authentication helpers and the current transport recommendation.
 It supersedes the tentative v1 transport sketch below. MCP remains disabled;
 all hosted integrations and Phase 1B.2 still require separate approval.
+
+Update: [Phase 1B.2](phase-1b2-mcp.md) implements the authenticated SDK v2
+endpoint and synthetic probes behind a disabled-by-default, expiring gate.
+This supersedes the integration status above. Hosted setup, deployment and
+ChatGPT OAuth testing still require separate approval; there is no database yet.
 Decision date: 9 November 2026 (Australia/Melbourne).
 
 ## Context and evidence

@@ -1,11 +1,8 @@
-// Phase 1A deliberately registers no transport, tools, identities or credentials.
-// The authenticated SDK adapter requires separate Phase 1B approval.
-function unavailable() {
-  return Response.json(
-    { error: 'INTEGRATION_NOT_CONFIGURED' },
-    { status: 503, headers: { 'Cache-Control': 'no-store' } },
-  );
-}
-export const GET = unavailable;
-export const POST = unavailable;
-export const DELETE = unavailable;
+import { mcpRequest } from '../../lib/mcp';
+
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+export const maxDuration = 15;
+export const GET = mcpRequest;
+export const POST = mcpRequest;
+export const DELETE = mcpRequest;

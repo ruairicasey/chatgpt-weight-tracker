@@ -1,7 +1,7 @@
 import 'server-only';
 import { createLocalJWKSet, errors, type JSONWebKeySet, type JWTHeaderParameters } from 'jose';
 import type { OAuthConfig } from '@weight-tracker/config/server';
-import { AuthenticationError } from './errors.js';
+import { AuthenticationError } from './errors';
 
 const CACHE_MS = 300_000;
 const COOLDOWN_MS = 30_000;

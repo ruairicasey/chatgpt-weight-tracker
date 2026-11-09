@@ -1,0 +1,20 @@
+{
+  "name": "@weight-tracker/mcp",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    "./server": "./src/server.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/server": "2.4.0",
+    "@weight-tracker/auth": "workspace:*",
+    "@weight-tracker/config": "workspace:*",
+    "@weight-tracker/contracts": "workspace:*",
+    "server-only": "0.0.1",
+    "zod": "4.6.7"
+  }
+}
