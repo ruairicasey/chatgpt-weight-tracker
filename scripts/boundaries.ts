@@ -4,13 +4,13 @@ import ts from 'typescript';
 
 const allowed: Readonly<Record<string, readonly string[]>> = {
   web: ['contracts', 'config', 'auth', 'domain', 'db'],
-  contracts: [], config: ['contracts'], auth: ['contracts'],
+  contracts: [], config: ['contracts'], auth: ['contracts', 'config'],
   domain: ['auth', 'contracts'], db: ['domain'],
 };
 const serverPackages = new Set(['config', 'auth', 'domain', 'db']);
 const namespace = '@weight-tracker/';
 
-type PackageInfo = { directory: string; shortName: string; dependencies: Set<string> };
+type PackageInfo = { directory: string; shortName: string; dependencies: Set<string>; exports: Record<string, string> };
 function sourceFiles(directory: string): string[] {
   return readdirSync(directory, { withFileTypes: true }).flatMap(entry => {
     if (['node_modules', '.next', 'dist'].includes(entry.name)) return [];
@@ -43,8 +43,8 @@ export function inspectBoundaries(root: string): string[] {
   const packages: PackageInfo[] = ['apps', 'packages'].flatMap(parent =>
     readdirSync(join(root, parent), { withFileTypes: true }).filter(entry => entry.isDirectory()).map(entry => {
       const directory = resolve(root, parent, entry.name);
-      const manifest = JSON.parse(readFileSync(join(directory, 'package.json'), 'utf8')) as { name: string; dependencies?: Record<string, string>; devDependencies?: Record<string, string> };
-      return { directory, shortName: manifest.name.replace(namespace, ''), dependencies: new Set(Object.keys({ ...manifest.dependencies, ...manifest.devDependencies })) };
+      const manifest = JSON.parse(readFileSync(join(directory, 'package.json'), 'utf8')) as { name: string; exports?: Record<string, string>; dependencies?: Record<string, string>; devDependencies?: Record<string, string> };
+      return { directory, shortName: manifest.name.replace(namespace, ''), dependencies: new Set(Object.keys({ ...manifest.dependencies, ...manifest.devDependencies })), exports: manifest.exports ?? { '.': './src/index.ts' } };
     }),
   );
   const files = packages.flatMap(pkg => sourceFiles(pkg.directory));
@@ -64,8 +64,11 @@ export function inspectBoundaries(root: string): string[] {
       for (const specifier of imports(source)) {
         if (specifier.startsWith(namespace)) {
           if (!pkg.dependencies.has(specifier.split('/').slice(0, 2).join('/'))) problems.push(`${relative(root, file)}: undeclared workspace import ${specifier}`);
-          const target = packages.find(value => specifier === `${namespace}${value.shortName}`);
-          if (target) targets.push(join(target.directory, 'src/index.ts'));
+          const name = specifier.split('/').slice(0, 2).join('/');
+          const target = packages.find(value => name === `${namespace}${value.shortName}`);
+          const subpath = specifier === name ? '.' : `.${specifier.slice(name.length)}`;
+          const exported = target?.exports[subpath];
+          if (target && exported && inside(resolve(target.directory, exported), target.directory)) targets.push(resolve(target.directory, exported));
           else problems.push(`${relative(root, file)}: unsupported workspace subpath ${specifier}`);
         } else if (specifier.startsWith('.')) {
           const path = resolve(dirname(file), specifier);

@@ -1,6 +1,11 @@
 # ADR 001: Phase 1A foundation with a hard zero-cost boundary
 
 Status: approved architecture; Phase 1A scaffold implemented, integrations planned.
+
+Update: [ADR 002](phase-1b1-authentication.md) records Phase 1B.1's implemented
+server-only authentication helpers and the current transport recommendation.
+It supersedes the tentative v1 transport sketch below. MCP remains disabled;
+all hosted integrations and Phase 1B.2 still require separate approval.
 Decision date: 9 November 2026 (Australia/Melbourne).
 
 ## Context and evidence

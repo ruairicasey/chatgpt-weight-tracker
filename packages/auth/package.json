@@ -4,12 +4,16 @@
   "version": "0.1.0",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./server": "./src/server.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@weight-tracker/contracts": "workspace:*"
+    "@weight-tracker/config": "workspace:*",
+    "@weight-tracker/contracts": "workspace:*",
+    "jose": "6.2.15",
+    "server-only": "0.0.1"
   }
 }

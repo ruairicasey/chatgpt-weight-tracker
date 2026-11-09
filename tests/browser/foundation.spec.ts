@@ -13,10 +13,10 @@ test('landing page is usable on desktop and mobile without pretending login or l
 });
 
 test('MCP stays disabled even when a caller sends tokens, synthetic writes or forged ownership', async ({ request }) => {
-  for (const method of ['GET', 'POST', 'DELETE']) {
+  for (const method of ['GET', 'POST', 'DELETE']) for (const headers of [{}, { Authorization: 'Bearer synthetic-not-a-token' }]) {
     const response = await request.fetch('/mcp', {
       method,
-      headers: { Authorization: 'Bearer synthetic-not-a-token' },
+      headers,
       ...(method === 'POST' ? { data: { jsonrpc: '2.0', method: 'tools/call', params: { name: 'write_probe', arguments: { userId: 'forged' } }, id: 1 } } : {}),
     });
     expect(response.status()).toBe(503);
@@ -24,4 +24,5 @@ test('MCP stays disabled even when a caller sends tokens, synthetic writes or fo
     expect(await response.json()).toEqual({ error: 'INTEGRATION_NOT_CONFIGURED' });
   }
   expect((await request.get('/.well-known/oauth-protected-resource')).status()).toBe(404);
+  expect((await request.get('/.well-known/oauth-protected-resource/mcp')).status()).toBe(404);
 });

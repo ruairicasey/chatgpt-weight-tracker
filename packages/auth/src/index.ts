@@ -3,7 +3,7 @@ import type { TrackerScope, UserId } from '@weight-tracker/contracts';
 declare const verifiedIdentityBrand: unique symbol;
 declare const verifiedPrincipalBrand: unique symbol;
 
-/** Produced only by a future server-side cryptographic verifier, not Zod parsing. */
+/** Produced only by the server-side cryptographic verifier, not Zod parsing. */
 export type VerifiedExternalIdentity = Readonly<{
   issuer: string;
   subject: string;
@@ -27,5 +27,4 @@ export interface PrincipalResolver {
   resolve(identity: VerifiedExternalIdentity): Promise<VerifiedPrincipal>;
 }
 
-// Interfaces only: no verifier, anonymous fallback, JWT decoder, account linking,
-// Supabase session handling or constructor that turns tool input into a principal.
+// Type-only public surface. Implementations are available only at ./server.

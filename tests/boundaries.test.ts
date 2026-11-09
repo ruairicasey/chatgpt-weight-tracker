@@ -52,3 +52,15 @@ test('approved contracts are safe for a client; active workspace passes boundari
   assert.deepEqual(inspectBoundaries(h.root), []);
   assert.deepEqual(inspectBoundaries(process.cwd()), []);
 });
+
+test('client imports of explicit server exports are rejected; private implementation paths stay inaccessible', t => {
+  const h = fixture(t);
+  h.pkg('web', ['auth'], "'use client'; import '@weight-tracker/auth/server'; import '@weight-tracker/auth/src/trusted-keys';");
+  h.pkg('auth', [], '');
+  const directory = join(h.root, 'packages/auth');
+  writeFileSync(join(directory, 'package.json'), JSON.stringify({ name: '@weight-tracker/auth', exports: { '.': './src/index.ts', './server': './src/server.ts' } }));
+  writeFileSync(join(directory, 'src/server.ts'), "import 'server-only';");
+  const problems = inspectBoundaries(h.root);
+  assert(problems.some(problem => problem.includes('client reaches server package auth')));
+  assert(problems.some(problem => problem.includes('unsupported workspace subpath')));
+});
