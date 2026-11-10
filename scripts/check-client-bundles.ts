@@ -4,12 +4,14 @@ import { join } from 'node:path';
 
 // Synthetic tripwires only. Never print environment values or read actual credentials.
 const canaries = {
-  MCP_OAUTH_ISSUER: 'https://bundle-canary.auth0.com/',
+  MCP_OAUTH_ISSUER: 'https://canaryabcdefghijklmn.supabase.co/auth/v1',
+  SUPABASE_URL: 'https://canaryabcdefghijklmn.supabase.co',
+  SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_synthetic_secret_bundle_canary',
+  APP_ORIGIN: 'https://bundle-canary.vercel.app',
+  CHATGPT_OAUTH_REDIRECT_URI: 'https://chatgpt.com/connector/oauth/bundle-canary',
   MCP_OAUTH_AUDIENCE: 'https://bundle-canary.vercel.app/mcp',
-  MCP_OAUTH_CLIENT_ID: 'synthetic-private-client-bundle-canary',
-  MCP_OWNER_SUBJECT: 'auth0|synthetic-private-owner-bundle-canary',
+  MCP_OAUTH_CLIENT_ID: '00000000-0000-4000-8000-000000000122',
   MCP_OWNER_USER_ID: '00000000-0000-4000-8000-000000000123',
-  AUTH0_CLIENT_SECRET: 'synthetic-secret-bundle-canary-never-real',
 };
 const build = spawnSync('pnpm', ['build'], { stdio: 'inherit', env: { ...process.env, ...canaries, MCP_EXPERIMENT_ENABLED: 'false', NEXT_TELEMETRY_DISABLED: '1' } });
 if (build.status !== 0) process.exit(build.status ?? 1);

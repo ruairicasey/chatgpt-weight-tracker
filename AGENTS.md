@@ -10,7 +10,8 @@ never charges. If free terms change, stop or propose a free migration; do not
 upgrade. Provider availability and future pricing cannot be guaranteed.
 
 Planned services: Vercel Hobby (one Next.js dashboard + MCP deployment), Supabase
-Free (PostgreSQL + dashboard Auth), Auth0 Free (MCP OAuth). Use provider hostnames.
+Free (PostgreSQL + dashboard Auth + MCP OAuth). No separate identity provider.
+Use provider hostnames.
 Do not assume trial features are Free entitlements. See docs/architecture.md.
 
 ## Approval and scope
@@ -35,6 +36,17 @@ and expire within 24 hours. Temporary bounded memory is permitted only for
 synthetic probes and must never be described as durable. No deployment, account
 creation, infrastructure, production credentials, Supabase integration or merge
 of the Phase 1B.2 PR is authorized. See docs/phase-1b2-mcp.md.
+
+The approved Supabase authentication integration supersedes the earlier Auth0
+provider and subject-mapping assumptions. It authorizes Supabase-specific JWT
+verification, owner-only application permissions, login/consent UI, a reviewed
+Custom Access Token hook migration, synthetic tests and documentation. No Auth0
+or Descope adapter is selected. See docs/supabase-authentication.md.
+Do not create accounts, apply hosted migrations, configure real credentials,
+deploy, activate MCP, log tracker data or merge without separate approval.
+Keep OAuth OIDC scopes distinct from internal tracker permissions. Never weaken
+owner, approved-client or canonical audience checks to pass compatibility tests.
+Custom-audience PostgREST/RLS access and actual ChatGPT OAuth remain live gates.
 
 ## Security and privacy
 

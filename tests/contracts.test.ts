@@ -6,7 +6,7 @@ import { ConfigurationError, parseFoundationConfig } from '@weight-tracker/confi
 const operationKey = 'f54ced07-d5b0-47c7-8d80-c2e6e5f3374a';
 const freeConfig = {
   environment: 'test', additionalMonthlyBudget: 0, hostingPlan: 'vercel-hobby',
-  databasePlan: 'supabase-free', mcpOAuthPlan: 'auth0-free', timezone: 'Australia/Melbourne',
+  databasePlan: 'supabase-free', mcpOAuthPlan: 'supabase-free', timezone: 'Australia/Melbourne',
 };
 
 test('operation envelope rejects acting identities, unknown fields and malformed keys', () => {

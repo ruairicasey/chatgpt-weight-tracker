@@ -14,7 +14,7 @@ function strongModulus(value: unknown): value is string {
     (bytes.length > 256 ? bytes[0] !== 0 : bytes.length === 256 && bytes[0]! >= 128);
 }
 
-/** Only an operator-configured Auth0 issuer may supply metadata/keys. No token URLs. */
+/** Only an operator-configured Supabase issuer may supply metadata/keys. No token URLs. */
 export function trustedKeys(config: OAuthConfig, fetcher: typeof fetch) {
   let cached: ReturnType<typeof createLocalJWKSet> | undefined;
   let expires = 0;
@@ -49,14 +49,18 @@ export function trustedKeys(config: OAuthConfig, fetcher: typeof fetch) {
     if (Date.now() < nextAttempt) throw new AuthenticationError('temporarily_unavailable');
     nextAttempt = Date.now() + COOLDOWN_MS;
     pending = (async () => {
-      const metadata = await json(`${config.issuer}.well-known/openid-configuration`) as Record<string, unknown> | null;
-      const jwksUri = `${config.issuer}.well-known/jwks.json`;
+      const metadata = await json(`${config.issuer}/.well-known/openid-configuration`) as Record<string, unknown> | null;
+      const jwksUri = `${config.issuer}/.well-known/jwks.json`;
       if (!metadata || metadata.issuer !== config.issuer || metadata.jwks_uri !== jwksUri) throw new Error('Untrusted discovery');
       const body = await json(jwksUri) as JSONWebKeySet | null;
       if (!body || !Array.isArray(body.keys) || body.keys.length < 1 || body.keys.length > 10) throw new Error('Invalid keys');
-      const keys = body.keys.filter(key => key && key.kty === 'RSA' && key.use === 'sig' && key.alg === 'RS256' &&
+      const coordinate = (value: unknown) => typeof value === 'string' && /^[A-Za-z0-9_-]{43}$/.test(value) &&
+        Buffer.from(value, 'base64url').toString('base64url') === value;
+      const keys = body.keys.filter(key => key && key.use === 'sig' && key.alg === config.signingAlgorithm &&
         typeof key.kid === 'string' && key.kid.length > 0 && !('d' in key) &&
-        strongModulus(key.n) && key.e === 'AQAB');
+        (config.signingAlgorithm === 'RS256'
+          ? key.kty === 'RSA' && strongModulus(key.n) && key.e === 'AQAB'
+          : key.kty === 'EC' && key.crv === 'P-256' && coordinate(key.x) && coordinate(key.y)));
       if (!keys.length || new Set(keys.map(key => key.kid)).size !== keys.length) throw new Error('Invalid signing keys');
       cached = createLocalJWKSet({ keys });
       expires = Date.now() + CACHE_MS;

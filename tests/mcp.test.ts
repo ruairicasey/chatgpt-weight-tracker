@@ -14,7 +14,7 @@ test('activation requires complete config, exact opt-in and a future deadline of
     { MCP_EXPERIMENT_EXPIRES_AT: '2026-11-10T12:00:00+99:99' },
     { MCP_EXPERIMENT_EXPIRES_AT: new Date(Date.now() - 1).toISOString() },
     { MCP_EXPERIMENT_EXPIRES_AT: new Date(Date.now() + 86_401_000).toISOString() },
-    { MCP_OWNER_SUBJECT: undefined }, { NEXT_PUBLIC_MCP_EXPERIMENT_ENABLED: 'true' },
+    { MCP_OWNER_USER_ID: undefined }, { NEXT_PUBLIC_MCP_EXPERIMENT_ENABLED: 'true' },
   ]) assert.throws(() => loadMcpExperimentConfig({ ...h.env, ...override }), OAuthConfigurationError);
   assert(loadMcpExperimentConfig(h.env).expiresAt > Date.now());
 });
@@ -25,7 +25,7 @@ test('protected resource metadata is canonical, minimal and unauthenticated, and
   assert.equal(response.status, 200);
   assert.equal(response.headers.get('cache-control'), 'no-store');
   assert.deepEqual(await response.json(), { resource: h.env.MCP_OAUTH_AUDIENCE, authorization_servers: [h.env.MCP_OAUTH_ISSUER],
-    scopes_supported: ['tracker:read', 'entries:write'], bearer_methods_supported: ['header'], resource_name: 'Synthetic MCP connectivity experiment' });
+    scopes_supported: ['openid'], bearer_methods_supported: ['header'], resource_name: 'Synthetic MCP connectivity experiment' });
   assert.equal(h.fetches(), 0);
   t.mock.method(Date, 'now', () => Date.parse(h.env.MCP_EXPERIMENT_EXPIRES_AT) + 1);
   assert.equal(h.app.metadata().status, 503);
@@ -43,12 +43,12 @@ test('gateway checks every request configuration and discards state after disabl
   assert.equal(gateway.metadata().status, 200);
   const bearer = await h.token();
   await gateway.fetch(h.request(toolCall('write_probe', { slot: 'synthetic-1', value: 'alpha', operationKey: randomUUID() }), bearer));
-  env.MCP_OWNER_SUBJECT = undefined;
+  env.MCP_OWNER_USER_ID = undefined;
   assert.equal((await gateway.fetch(h.request(toolCall('read_probe', { slot: 'synthetic-1' }), bearer))).status, 503);
   env = { ...h.env };
   const read = await rpc(await gateway.fetch(h.request(toolCall('read_probe', { slot: 'synthetic-1' }), bearer)));
   assert.equal((read.result as { structuredContent: { found: boolean } }).structuredContent.found, false);
-  env.MCP_OWNER_SUBJECT = 'auth0|another-approved-owner';
+  env.MCP_OWNER_USER_ID = '00000000-0000-4000-8000-000000000003';
   assert.equal((await gateway.fetch(h.request(toolCall('read_probe', { slot: 'synthetic-1' }), bearer))).status, 403);
 });
 
@@ -60,8 +60,8 @@ test('anonymous, invalid, expired, wrong audience/client/owner and missing scope
     [await h.token({ exp: Math.floor(Date.now() / 1000) - 1 }), 401, 'invalid_token'],
     [await h.token({ aud: 'https://other.vercel.app/mcp' }), 401, 'invalid_token'],
     [await h.token({ client_id: 'unapproved' }), 403, 'access_denied'],
-    [await h.token({ sub: 'auth0|unapproved' }), 403, 'access_denied'],
-    [await h.token({ scope: 'openid' }), 403, 'insufficient_scope'],
+    [await h.token({ sub: '00000000-0000-4000-8000-000000000003' }), 403, 'access_denied'],
+    [await h.token({ scope: 'email' }), 403, 'insufficient_scope'],
   ] as const) {
     const response = await h.app.fetch(h.request(operation, bearer));
     assert.equal(response.status, status);
@@ -86,7 +86,7 @@ for (const protocolVersion of ['2025-03-26', '2025-06-18', '2025-11-25']) test(`
   assert.deepEqual(tools.map(tool => tool.name), ['read_probe', 'write_probe']);
   assert.equal(tools[0]?.annotations.readOnlyHint, true);
   assert.equal(tools[1]?.annotations.readOnlyHint, false);
-  assert.deepEqual(tools[1]?._meta, { securitySchemes: [{ type: 'oauth2', scopes: ['entries:write'] }] });
+  assert.deepEqual(tools[1]?._meta, { securitySchemes: [{ type: 'oauth2', scopes: ['openid'] }] });
   const write = await rpc(await h.app.fetch(h.request(toolCall('write_probe', { slot: 'synthetic-1', value: 'alpha', operationKey: randomUUID() }), bearer, headers)));
   assert.equal((write.result as { structuredContent: { outcome: string } }).structuredContent.outcome, 'created');
 });
@@ -168,21 +168,14 @@ test('temporary writes replay within one instance, conflict safely and disappear
   assert.equal((afterTtl.result as { structuredContent: { found: boolean } }).structuredContent.found, false);
 });
 
-test('per-tool scope challenges and concurrent requests never inherit another request identity', async () => {
+test('concurrent calls keep owner, unknown client and anonymous identities isolated', async () => {
   const h = fixture();
-  const readOnly = await h.token({ scope: 'tracker:read' });
-  const writeOnly = await h.token({ scope: 'entries:write' });
   const args = { slot: 'synthetic-1', value: 'alpha', operationKey: randomUUID() };
-  const bodies = await Promise.all([writeOnly, readOnly, undefined, await h.token({ sub: 'auth0|other' })].map(bearer => h.app.fetch(h.request(toolCall('write_probe', args), bearer))));
-  assert.deepEqual(bodies.map(response => response.status), [200, 200, 401, 403]);
-  const permitted = (await rpc(bodies[0]!)).result as { structuredContent: { outcome: string } };
-  assert.equal(permitted.structuredContent.outcome, 'created');
-  const denied = (await rpc(bodies[1]!)).result as { isError: boolean; _meta: Record<string, string[]> };
-  assert.equal(denied.isError, true);
-  assert.match(denied._meta['mcp/www_authenticate']?.[0] ?? '', /error="insufficient_scope"/);
-  assert.match(denied._meta['mcp/www_authenticate']?.[0] ?? '', /scope="entries:write"/);
-  const deniedRead = await rpc(await h.app.fetch(h.request(toolCall('read_probe', { slot: 'synthetic-1' }), writeOnly)));
-  assert.equal((deniedRead.result as { isError: boolean }).isError, true);
+  const tokens = [await h.token(), await h.token({ client_id: 'unknown' }), undefined, await h.token({ sub: '00000000-0000-4000-8000-000000000003' })];
+  const responses = await Promise.all(tokens.map(bearer => h.app.fetch(h.request(toolCall('write_probe', args), bearer))));
+  assert.deepEqual(responses.map(response => response.status), [200, 403, 401, 403]);
+  const body = await rpc(responses[0]!);
+  assert.equal((body.result as { structuredContent: { outcome: string } }).structuredContent.outcome, 'created');
 });
 
 test('strict synthetic schemas reject forged ownership, arbitrary data and receipt fields', async () => {
@@ -193,7 +186,6 @@ test('strict synthetic schemas reject forged ownership, arbitrary data and recei
     assert(response.error || (response.result as { isError?: boolean } | undefined)?.isError);
     assert(!JSON.stringify(response).includes('private-arbitrary-payload'));
     assert(!JSON.stringify(response).includes(h.env.MCP_OWNER_USER_ID));
-    assert(!JSON.stringify(response).includes(h.env.MCP_OWNER_SUBJECT));
   }
 });
 

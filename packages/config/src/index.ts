@@ -8,7 +8,7 @@ export const FoundationConfigSchema = z.strictObject({
   additionalMonthlyBudget: z.literal(0),
   hostingPlan: z.literal('vercel-hobby'),
   databasePlan: z.literal('supabase-free'),
-  mcpOAuthPlan: z.literal('auth0-free'),
+  mcpOAuthPlan: z.literal('supabase-free'),
   timezone: z.literal(MELBOURNE_TIME_ZONE),
 });
 export type FoundationConfig = z.infer<typeof FoundationConfigSchema>;

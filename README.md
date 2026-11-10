@@ -5,21 +5,20 @@ private PostgreSQL storage and a private web dashboard. **Additional operating
 cost must remain $0.** Only ongoing Free/Hobby plans are permitted; no trials,
 usage billing, paid domains, automatic upgrades or additional model APIs.
 
-## Current status: Phase 1B.2 (disabled by default)
+## Current status: Supabase authentication integration (MCP disabled)
 
-This branch contains a credential-free monorepo foundation, not a working tracker.
-The Next.js landing shell is available locally. Login, persistence, food/weight/
-exercise features and hosted OAuth are not available. Server-only configuration,
-cryptographic JWT verification, owner/scope authorization and secure OAuth error
-helpers are implemented and tested locally. The official SDK v2 MCP adapter and
-two authenticated synthetic probes are implemented but disabled by default:
-`/mcp` and OAuth resource metadata return 503 without complete configuration,
-explicit activation and an unexpired deadline. No hosted OAuth has been tested.
-Deployment and ChatGPT connection require separate approval. See
-[ADR 002](docs/phase-1b1-authentication.md) for configuration/security details,
-Auth0 ongoing Free gates and the official SDK versus `mcp-handler` 2.x comparison.
-Read [Phase 1B.2 and the manual acceptance runbook](docs/phase-1b2-mcp.md)
-for the pinned SDK API, protocol results, activation and temporary storage limits.
+The two planned services are **Vercel Hobby** and **Supabase Free**, alongside the
+owner's existing ChatGPT Plus subscription. No separate OAuth provider is selected.
+
+Supabase-specific JWT verification, owner authorization, login/consent pages and a
+reviewed token-hook migration are implemented for review. The official SDK v2
+synthetic MCP probes remain disabled without complete configuration, explicit
+activation and an unexpired deadline. No hosted setup or OAuth has been tested.
+There are no tracker records, database runtime connections or tracker features.
+
+Read [the current architecture](docs/architecture.md) and
+[Supabase setup, compatibility gates and rollback](docs/supabase-authentication.md).
+Historical phase documents describe superseded authentication choices.
 
 The owner verified unauthenticated read/write execution, idempotent replay and
 new-chat readback on their ChatGPT Plus account during Phase 0. OAuth and durable
@@ -71,7 +70,7 @@ Individual checks:
 
 Browser tests start the built app on loopback port 3100 and stop it afterward.
 They require `pnpm build` first; `pnpm check` already runs it. They never connect
-to ChatGPT, Auth0 or Supabase. Playwright traces are disabled; generated reports,
+to ChatGPT or Supabase. Playwright traces are disabled; generated reports,
 local state and private backups are ignored. Standard GitHub-hosted Linux CI runs
 these checks with no credentials and has no deployment job.
 
@@ -90,7 +89,7 @@ and have read-only repository permissions.
 | `packages/auth` | Principal types plus server-only JWT verification and owner/scope resolution |
 | `packages/mcp` | Server-only stateless SDK v2 adapter, activation gate and synthetic probes |
 | `packages/domain` | Use-case/transaction boundaries; no tracker implementations |
-| `packages/db` | Drizzle/Postgres types only; no connection or migrations |
+| `packages/db` | Drizzle/Postgres types only; authentication hook migration under `supabase/` |
 | `references/phase0` | Original disposable probe, excluded from active workspace/build |
 
 Shared packages are private source packages, not published npm packages. No
@@ -100,8 +99,8 @@ only the trusted server verifier/resolver may establish authenticated ownership.
 ## Planned hosting and boundaries
 
 One **Vercel Hobby** deployment will host the dashboard and stateless MCP HTTP
-adapter, **Supabase Free** supplies PostgreSQL/dashboard login, and **Auth0 Free**
-supplies managed MCP OAuth. Use free provider hostnames. Quotas can cause downtime;
+adapter; **Supabase Free** supplies PostgreSQL, dashboard login and managed MCP
+OAuth. Use free provider hostnames. Quotas can cause downtime;
 there is no availability or indefinite-capacity guarantee. If free terms change,
 stop or migrate, never enable billing. No infrastructure is configured here.
 
