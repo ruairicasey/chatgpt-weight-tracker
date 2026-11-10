@@ -33,7 +33,7 @@ export function createOwnerAuthentication(input: OAuthConfig, fetcher: typeof fe
             'jku' in header || 'jwk' in header || 'x5u' in header || 'crit' in header) throw new AuthenticationError('invalid_token');
         const { payload } = await jwtVerify(accessToken, keys, {
           issuer: config.issuer, audience: config.audience, algorithms: [config.signingAlgorithm], typ: 'JWT',
-          requiredClaims: ['iss', 'aud', 'exp', 'iat', 'sub', 'client_id', 'scope', 'role', 'session_id', 'is_anonymous'],
+          requiredClaims: ['iss', 'aud', 'exp', 'iat', 'sub', 'client_id', 'role', 'session_id', 'is_anonymous'],
           clockTolerance: 0, maxTokenAge: 600,
         });
         const now = Math.floor(Date.now() / 1000);
@@ -42,9 +42,11 @@ export function createOwnerAuthentication(input: OAuthConfig, fetcher: typeof fe
             typeof payload.sub !== 'string' || !payload.sub || payload.sub.length > 256 ||
             payload.role !== 'authenticated' || payload.is_anonymous !== false ||
             !UserIdSchema.safeParse(payload.session_id).success || !UserIdSchema.safeParse(payload.sub).success ||
-            typeof payload.scope !== 'string' || payload.scope.length > 2048 || !/^[\x21\x23-\x5b\x5d-\x7e]+(?: [\x21\x23-\x5b\x5d-\x7e]+)*$/.test(payload.scope)) throw new AuthenticationError('invalid_token');
+            (payload.scope !== undefined && (typeof payload.scope !== 'string' || payload.scope.length > 2048 ||
+              (payload.scope !== '' && !/^[\x21\x23-\x5b\x5d-\x7e]+(?: [\x21\x23-\x5b\x5d-\x7e]+)*$/.test(payload.scope))))) throw new AuthenticationError('invalid_token');
         if (payload.client_id !== config.clientId || payload.sub !== config.ownerUserId) throw denied();
-        if (!payload.scope.split(' ').includes('openid')) throw new AuthenticationError('insufficient_scope');
+        // Supabase scope is optional (omitempty) and describes OIDC identity access.
+        // Missing/empty/other OIDC scopes never change the fixed owner CRUD policy.
         // Internal domain permissions: fixed owner policy, NOT Supabase OAuth scopes.
         // Never derive grants from user_metadata, permissions or caller arguments.
         const scopes = TrackerScopeSchema.options;

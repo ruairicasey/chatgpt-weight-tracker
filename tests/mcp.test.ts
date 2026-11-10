@@ -52,7 +52,7 @@ test('gateway checks every request configuration and discards state after disabl
   assert.equal((await gateway.fetch(h.request(toolCall('read_probe', { slot: 'synthetic-1' }), bearer))).status, 403);
 });
 
-test('anonymous, invalid, expired, wrong audience/client/owner and missing scopes never reach tools', async () => {
+test('anonymous, invalid, expired, wrong audience/client/owner and malformed claims never reach tools', async () => {
   const h = fixture();
   const operation = toolCall('write_probe', { slot: 'synthetic-1', value: 'alpha', operationKey: randomUUID() });
   for (const [bearer, status, error] of [
@@ -61,13 +61,13 @@ test('anonymous, invalid, expired, wrong audience/client/owner and missing scope
     [await h.token({ aud: 'https://other.vercel.app/mcp' }), 401, 'invalid_token'],
     [await h.token({ client_id: 'unapproved' }), 403, 'access_denied'],
     [await h.token({ sub: '00000000-0000-4000-8000-000000000003' }), 403, 'access_denied'],
-    [await h.token({ scope: 'email' }), 403, 'insufficient_scope'],
+    [await h.token({ scope: ['openid'] }), 401, 'invalid_token'],
   ] as const) {
     const response = await h.app.fetch(h.request(operation, bearer));
     assert.equal(response.status, status);
     assert.deepEqual(await response.json(), { error });
     assert.equal(response.headers.get('cache-control'), 'no-store');
-    if (status === 401 || error === 'insufficient_scope') assert.match(response.headers.get('www-authenticate') ?? '', /resource_metadata="https:\/\/synthetic-probe.vercel.app\/\.well-known\/oauth-protected-resource\/mcp"/);
+    if (status === 401) assert.match(response.headers.get('www-authenticate') ?? '', /resource_metadata="https:\/\/synthetic-probe.vercel.app\/\.well-known\/oauth-protected-resource\/mcp"/);
   }
   const read = await rpc(await h.app.fetch(h.request(toolCall('read_probe', { slot: 'synthetic-1' }), await h.token())));
   assert.equal((read.result as { structuredContent: { found: boolean } }).structuredContent.found, false);
@@ -207,4 +207,16 @@ test('method, host/origin, media type, body size, batches and request-rate limit
   const response = await limited.app.fetch(limited.request(ping));
   assert.equal(response.status, 429);
   assert.equal(response.headers.get('retry-after'), '60');
+});
+
+
+test('owner probes work without an OAuth scope claim; discovery still requests standard openid', async () => {
+  const h = fixture();
+  const bearer = await h.token({ scope: undefined });
+  const args = { slot: 'synthetic-1', value: 'alpha', operationKey: randomUUID() };
+  const write = await rpc(await h.app.fetch(h.request(toolCall('write_probe', args), bearer)));
+  assert.equal((write.result as { structuredContent: { outcome: string } }).structuredContent.outcome, 'created');
+  const read = await rpc(await h.app.fetch(h.request(toolCall('read_probe', { slot: args.slot }), bearer)));
+  assert.equal((read.result as { structuredContent: { found: boolean } }).structuredContent.found, true);
+  assert.deepEqual((await h.app.metadata().json()).scopes_supported, ['openid']);
 });

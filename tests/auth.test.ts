@@ -89,7 +89,7 @@ test('invalid JWTs fail closed: issuer, audience, type, lifetime, shape, signatu
     'missing expiry': { exp: undefined }, 'missing issued-at': { iat: undefined },
     'fractional expiry': { exp: now + 300.5 }, 'missing client': { client_id: undefined, azp: config.clientId },
     'missing subject': { sub: undefined }, 'missing session': { session_id: undefined }, 'anonymous': { is_anonymous: true }, 'service role': { role: 'service_role' },
-    'scope array': { scope: ['tracker:read'] }, 'missing scopes': { scope: undefined },
+    'scope array': { scope: ['tracker:read'] }, 'null scope': { scope: null },
     'newline scope': { scope: 'tracker:read\nentries:write' },
   };
   for (const [name, overrides] of Object.entries(invalid)) await t.test(name, async () => {
@@ -129,7 +129,10 @@ test('full owner permissions are internal policy, not unsupported OAuth scopes',
   for (const scope of ['tracker:read', 'entries:write', 'entries:delete', 'targets:write'] as const) h.requireScopes(identity, [scope]);
   assert.throws(() => h.requireScopes(identity, []), failure('access_denied'));
   assert.throws(() => h.requireScopes(identity, ['unknown:admin' as never]), failure('access_denied'));
-  await assert.rejects(h.verifier.verify(await token({ scope: 'email profile' })), failure('insufficient_scope'));
+  for (const scope of [undefined, '', 'email profile']) {
+    const verified = await h.verifier.verify(await token({ scope }));
+    h.requireScopes(verified, ['entries:write']);
+  }
   await assert.rejects(h.verifier.verify(await token({ aud: 'authenticated', client_id: undefined })), failure('invalid_token'));
 });
 
@@ -174,7 +177,7 @@ test('unknown key IDs and concurrent requests cannot amplify JWKS network reques
 test('key rotation refreshes after cooldown and cached identities expire without reuse', async t => {
   const realNow = Date.now;
   let instant = realNow();
-  t.mock.method(Date, 'now', () => instant);
+  t.mock.timers.enable({ apis: ['Date'], now: instant });
   const replacement = await generateKeyPair('RS256');
   const replacementJwk = { ...await exportJWK(replacement.publicKey), kid: 'rotated', alg: 'RS256', use: 'sig' };
   let rotated = false;
@@ -186,6 +189,7 @@ test('key rotation refreshes after cooldown and cached identities expire without
   const identity = await h.verifier.verify(await token({ exp: Math.floor(instant / 1000) + 1 }));
   const rotatedToken = await new SignJWT(claims()).setProtectedHeader({ alg: 'RS256', typ: 'JWT', kid: 'rotated' }).sign(replacement.privateKey);
   instant += 31_000;
+  t.mock.timers.setTime(instant);
   rotated = true;
   await h.verifier.verify(rotatedToken);
   assert.equal(calls, 4);
@@ -240,4 +244,30 @@ test('Supabase ES256 profile validates with P-256 JWKS and rejects algorithm con
   await assert.rejects(h.verifier.verify(await token()), failure('invalid_token'));
   const invalid = createOwnerAuthentication(esConfig, async input => Response.json(String(input).endsWith('openid-configuration') ? metadata : { keys: [{ ...key, crv: 'P-384' }] }));
   await assert.rejects(invalid.verifier.verify(signed), failure('temporarily_unavailable'));
+});
+
+
+test('scope-less OAuth issuance and refresh retain every access-token security boundary', async () => {
+  const h = harness();
+  const now = Math.floor(Date.now() / 1000);
+  for (const method of ['oauth_provider/authorization_code', 'token_refresh']) {
+    const base = { scope: undefined, jti: undefined, amr: [{ method, timestamp: now }] };
+    const verified = await h.verifier.verify(await token(base));
+    assert.equal((await h.resolver.resolve(verified)).userId, config.ownerUserId);
+    for (const [override, code] of [
+      [{ aud: 'authenticated' }, 'invalid_token'],
+      [{ aud: config.clientId }, 'invalid_token'],
+      [{ iss: 'https://untrusted.example/auth/v1' }, 'invalid_token'],
+      [{ client_id: undefined }, 'invalid_token'],
+      [{ client_id: '00000000-0000-4000-8000-000000000003' }, 'access_denied'],
+      [{ sub: '00000000-0000-4000-8000-000000000003' }, 'access_denied'],
+      [{ role: 'service_role' }, 'invalid_token'],
+      [{ role: undefined }, 'invalid_token'],
+      [{ exp: now - 1, iat: now - 400 }, 'invalid_token'],
+      [{ is_anonymous: true }, 'invalid_token'],
+    ] as const) await assert.rejects(h.verifier.verify(await token({ ...base, ...override })), failure(code));
+    const wrong = await generateKeyPair('RS256');
+    const forged = await new SignJWT(Object.fromEntries(Object.entries({ ...claims(), ...base }).filter(([, value]) => value !== undefined))).setProtectedHeader({ alg: 'RS256', typ: 'JWT', kid: 'synthetic-key' }).sign(wrong.privateKey);
+    await assert.rejects(h.verifier.verify(forged), failure('invalid_token'));
+  }
 });

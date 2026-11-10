@@ -1,6 +1,8 @@
 # Supabase authentication: setup and acceptance runbook
 
 Status: implemented for review, not deployed. Date: 10 November 2026, Melbourne.
+See the [targeted OAuth contract review](oauth-compatibility-review.md) for pinned
+source evidence, the optional JWT scope decision and SDK response checks.
 All hosted steps below require separate owner approval. Do not create an account,
 enter real credentials, apply SQL, enable MCP or connect ChatGPT as part of this PR.
 No tracker data or durable tracker storage is implemented.
@@ -52,9 +54,10 @@ fixed by creating a custom OAuth server.
 - JWT header `typ: JWT`, configured ES256 (default) or RS256, bounded kid; reject
   embedded keys/URLs, symmetric algorithms and critical extensions. This is the
   Supabase token profile, not the superseded Auth0 RFC 9068 profile.
-- Require iss/aud/exp/iat/sub/client_id/scope/role/session_id/is_anonymous. Exact
+- Require iss/aud/exp/iat/sub/client_id/role/session_id/is_anonymous. Exact
   MCP audience membership, authenticated role, non-anonymous owner UUID, approved
-  client and openid. Timestamps are integers; no future iat/expiry grace; maximum
+  client. The JWT scope claim is optional and never grants tracker access; when
+  present it must be a bounded, well-formed string. Consent still requests openid. Timestamps are integers; no future iat/expiry grace; maximum
   age and total lifetime 600 seconds. Validate nbf when present. jti is not required
   by this profile; it was never durable business-operation idempotency.
 - Internal owner permissions cover tracker read/write/delete/targets. They are

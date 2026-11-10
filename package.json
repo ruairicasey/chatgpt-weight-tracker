@@ -25,6 +25,7 @@
     "@modelcontextprotocol/client": "2.4.0",
     "@next/eslint-plugin-next": "16.4.5",
     "@playwright/test": "1.65.0",
+    "@supabase/supabase-js": "2.119.0",
     "@types/node": "24.10.0",
     "@weight-tracker/auth": "workspace:*",
     "@weight-tracker/config": "workspace:*",

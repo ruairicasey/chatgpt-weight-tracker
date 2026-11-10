@@ -26,6 +26,9 @@ begin
   if claims is null or jsonb_typeof(claims) <> 'object' then
     raise exception 'Invalid access-token event';
   end if;
+  -- Supabase CustomAccessTokenInput carries client identity in claims.client_id.
+  -- Do not read a top-level client_id, authentication_method or user_metadata.
+  -- Both issuance and refresh call this hook through GenerateAccessToken.
   -- Direct dashboard login/refresh has no OAuth client: preserve it byte-for-byte.
   if nullif(claims->>'client_id', '') is null then
     return event;

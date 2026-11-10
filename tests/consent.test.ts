@@ -81,3 +81,49 @@ test('form parsing bounds streamed bodies, rejects duplicates and checks media t
   await assert.rejects(readForm(request('{}', 'application/json')));
   await assert.rejects(readForm(request('x=1', 'application/x-www-form-urlencoded-evil')));
 });
+
+test('pinned Supabase SDK returns raw consent details and the already-consented redirect union', async () => {
+  const { createClient } = await import('@supabase/supabase-js');
+  const { SignJWT, generateKeyPair } = await import('jose');
+  const key = await generateKeyPair('ES256');
+  const sessionToken = await new SignJWT({ sub: config.ownerId, role: 'authenticated' })
+    .setProtectedHeader({ alg: 'ES256', typ: 'JWT' }).setIssuedAt().setExpirationTime('5m').sign(key.privateKey);
+  // Type-check against the installed official SDK, not a parallel handwritten shape.
+  const responseDetails = {
+    ...details,
+    client: { id: config.clientId, name: 'Synthetic ChatGPT', uri: '', logo_uri: '' },
+    user: { id: config.ownerId, email: 'synthetic@example.invalid' },
+  } satisfies import('@supabase/supabase-js').OAuthAuthorizationDetails;
+  const redirected = { redirect_url: `${config.callbackUri}?code=synthetic&state=synthetic` } satisfies import('@supabase/supabase-js').OAuthRedirect;
+  const paths: string[] = [];
+  let alreadyConsented = false;
+  const client = createClient(config.supabaseUrl, config.publishableKey, {
+    auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false },
+    global: { fetch: async (input, init) => {
+      const path = new URL(String(input)).pathname;
+      paths.push(`${init?.method ?? 'GET'} ${path}`);
+      if (path.endsWith('/user')) return Response.json({ id: config.ownerId, is_anonymous: false, aud: 'authenticated', created_at: '2026-11-10T00:00:00Z', app_metadata: {}, user_metadata: {} });
+      assert.equal(new Headers(init?.headers).get('authorization'), `Bearer ${sessionToken}`);
+      if (path.endsWith('/consent')) {
+        assert.deepEqual(JSON.parse(String(init?.body)), { action: 'approve' });
+        return Response.json(redirected);
+      }
+      assert.equal(path, `/auth/v1/oauth/authorizations/${id}`);
+      return Response.json(alreadyConsented ? redirected : responseDetails);
+    } },
+  });
+  assert.equal((await client.auth.setSession({ access_token: sessionToken, refresh_token: 'synthetic-refresh' })).error, null);
+  const first = await client.auth.oauth.getAuthorizationDetails(id);
+  assert.equal(first.error, null);
+  requireConsentDetails(first.data, config, id);
+  // Backend omits optional cosmetic fields despite SDK declaring them required.
+  requireConsentDetails(details, config, id);
+  const approved = await client.auth.oauth.approveAuthorization(id, { skipBrowserRedirect: true });
+  assert.equal(approved.error, null);
+  assert.equal(consentRedirect(approved.data?.redirect_url, config), redirected.redirect_url);
+  alreadyConsented = true;
+  const repeated = await client.auth.oauth.getAuthorizationDetails(id);
+  assert.deepEqual(repeated.data, redirected);
+  assert.throws(() => requireConsentDetails(repeated.data, config, id));
+  assert(paths.includes(`POST /auth/v1/oauth/authorizations/${id}/consent`));
+});
