@@ -1,3 +1,7 @@
+> Historical phase record. Provider/configuration/permission instructions below
+> are superseded by [the Supabase integration](supabase-authentication.md).
+> Do not configure Auth0 or use the historical environment examples.
+
 # Phase 1B.2: gated authenticated synthetic MCP endpoint
 
 Status: implemented for code review; **not deployed or connected to ChatGPT**.

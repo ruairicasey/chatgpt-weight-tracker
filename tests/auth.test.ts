@@ -6,22 +6,22 @@ import { loadOAuthConfig, OAuthConfigurationError } from '@weight-tracker/config
 import type { VerifiedExternalIdentity } from '@weight-tracker/auth';
 
 const env = {
-  MCP_OAUTH_ISSUER: 'https://synthetic-owner.au.auth0.com/',
+  MCP_OAUTH_ISSUER: 'https://abcdefghijklmnopqrst.supabase.co/auth/v1',
   MCP_OAUTH_AUDIENCE: 'https://synthetic-tracker.vercel.app/mcp',
-  MCP_OAUTH_CLIENT_ID: 'synthetic-chatgpt-client',
-  MCP_OWNER_SUBJECT: 'auth0|synthetic-owner',
+  MCP_OAUTH_CLIENT_ID: '00000000-0000-4000-8000-000000000002',
+  MCP_OAUTH_SIGNING_ALGORITHM: 'RS256',
   MCP_OWNER_USER_ID: '00000000-0000-4000-8000-000000000001',
 };
 const config = loadOAuthConfig(env);
 const pair = await generateKeyPair('RS256');
 const publicKey = { ...await exportJWK(pair.publicKey), kid: 'synthetic-key', alg: 'RS256', use: 'sig' };
-const metadata = { issuer: config.issuer, jwks_uri: `${config.issuer}.well-known/jwks.json` };
+const metadata = { issuer: config.issuer, jwks_uri: `${config.issuer}/.well-known/jwks.json` };
 const claims = (): JWTPayload => {
   const now = Math.floor(Date.now() / 1000);
-  return { iss: config.issuer, aud: config.audience, sub: config.ownerSubject, client_id: config.clientId,
-    scope: 'openid tracker:read entries:write', iat: now, exp: now + 300, jti: 'synthetic-operation' };
+  return { iss: config.issuer, aud: config.audience, sub: config.ownerUserId, client_id: config.clientId,
+    scope: 'openid email profile', role: 'authenticated', is_anonymous: false, session_id: '00000000-0000-4000-8000-000000000004', iat: now, exp: now + 300, jti: 'synthetic-operation' };
 };
-async function token(overrides: Record<string, unknown> = {}, header: JWTHeaderParameters = { alg: 'RS256', typ: 'at+jwt', kid: 'synthetic-key' }) {
+async function token(overrides: Record<string, unknown> = {}, header: JWTHeaderParameters = { alg: 'RS256', typ: 'JWT', kid: 'synthetic-key' }) {
   const payload = Object.fromEntries(Object.entries({ ...claims(), ...overrides }).filter(([, value]) => value !== undefined));
   return new SignJWT(payload).setProtectedHeader(header).sign(pair.privateKey);
 }
@@ -33,7 +33,7 @@ function harness() {
     assert.equal(init?.redirect, 'error');
     assert.equal(init?.credentials, 'omit');
     assert(!init?.headers || !new Headers(init.headers).has('authorization'));
-    if (url === `${config.issuer}.well-known/openid-configuration`) return Response.json(metadata);
+    if (url === `${config.issuer}/.well-known/openid-configuration`) return Response.json(metadata);
     if (url === metadata.jwks_uri) return Response.json({ keys: [publicKey] });
     throw new Error('Unexpected URL');
   };
@@ -54,7 +54,7 @@ test('strict server configuration rejects missing, malformed, public and unsafe 
     { MCP_OAUTH_AUDIENCE: 'https://user:private@tracker.vercel.app/mcp' },
     { MCP_OAUTH_AUDIENCE: 'https://tracker.vercel.app/mcp?secret=private' },
     { MCP_OAUTH_CLIENT_ID: 'private\r\nInjected: true' }, { MCP_OWNER_USER_ID: 'private' },
-    { MCP_OWNER_SUBJECT: '' }, { MCP_OWNER_SUBJECT: 'synthetic@clients' },
+    { MCP_OWNER_USER_ID: '' }, { MCP_OWNER_USER_ID: 'synthetic@clients' },
     { NEXT_PUBLIC_MCP_OWNER_SUBJECT: 'private' },
   ]) assert.throws(() => loadOAuthConfig({ ...env, ...override }), (error: unknown) =>
     error instanceof OAuthConfigurationError && error.message === 'Invalid server OAuth configuration.' && !JSON.stringify(error).includes('private'));
@@ -66,13 +66,13 @@ test('valid access token verifies cryptographically, maps exact owner and enforc
   const identity = await h.verifier.verify(await token({ aud: [config.audience, `${config.issuer}userinfo`] }));
   const principal = await h.resolver.resolve(identity);
   assert.equal(principal.userId, config.ownerUserId);
-  assert.deepEqual(identity.scopes, ['tracker:read', 'entries:write']);
+  assert.deepEqual(identity.scopes, ['tracker:read', 'entries:write', 'entries:delete', 'targets:write']);
   h.requireScopes(identity, ['entries:write']);
   assert(Object.isFrozen(identity));
   assert(Object.isFrozen(identity.scopes));
   assert(Object.isFrozen(principal));
   assert(!JSON.stringify(principal).includes('Bearer'));
-  await h.verifier.verify(await token());
+  await h.verifier.verify(await token({ jti: undefined }));
   assert.equal(h.requests.length, 2, 'metadata and public keys are cached');
   const headers = new Headers({ authorization: `Bearer ${await token()}` });
   assert.equal((await h.authenticate(headers, ['tracker:read'])).userId, config.ownerUserId);
@@ -88,34 +88,34 @@ test('invalid JWTs fail closed: issuer, audience, type, lifetime, shape, signatu
     'long lifetime': { exp: now + 601 }, 'inverted lifetime': { exp: now - 1 },
     'missing expiry': { exp: undefined }, 'missing issued-at': { iat: undefined },
     'fractional expiry': { exp: now + 300.5 }, 'missing client': { client_id: undefined, azp: config.clientId },
-    'missing subject': { sub: undefined }, 'missing ID': { jti: undefined },
-    'scope array': { scope: ['tracker:read'] }, 'missing scopes': { scope: undefined },
+    'missing subject': { sub: undefined }, 'missing session': { session_id: undefined }, 'anonymous': { is_anonymous: true }, 'service role': { role: 'service_role' },
+    'scope array': { scope: ['tracker:read'] }, 'null scope': { scope: null },
     'newline scope': { scope: 'tracker:read\nentries:write' },
   };
   for (const [name, overrides] of Object.entries(invalid)) await t.test(name, async () => {
     await assert.rejects(h.verifier.verify(await token(overrides)), failure('invalid_token'));
   });
   for (const header of [
-    { alg: 'RS256', typ: 'JWT', kid: 'synthetic-key' },
+    { alg: 'RS256', typ: 'at+jwt', kid: 'synthetic-key' },
     { alg: 'RS256', kid: 'synthetic-key' },
-    { alg: 'RS256', typ: 'at+jwt' },
-    { alg: 'RS256', typ: 'at+jwt', kid: 'synthetic-key', jku: 'https://evil.example/keys' },
-    { alg: 'RS256', typ: 'at+jwt', kid: 'synthetic-key', jwk: publicKey },
+    { alg: 'RS256', typ: 'JWT' },
+    { alg: 'RS256', typ: 'JWT', kid: 'synthetic-key', jku: 'https://evil.example/keys' },
+    { alg: 'RS256', typ: 'JWT', kid: 'synthetic-key', jwk: publicKey },
   ]) await assert.rejects(h.verifier.verify(await token({}, header)), failure('invalid_token'));
   const wrongPair = await generateKeyPair('RS256');
-  const forged = await new SignJWT(claims()).setProtectedHeader({ alg: 'RS256', typ: 'at+jwt', kid: 'synthetic-key' }).sign(wrongPair.privateKey);
+  const forged = await new SignJWT(claims()).setProtectedHeader({ alg: 'RS256', typ: 'JWT', kid: 'synthetic-key' }).sign(wrongPair.privateKey);
   await assert.rejects(h.verifier.verify(forged), failure('invalid_token'));
-  const hmac = await new SignJWT(claims()).setProtectedHeader({ alg: 'HS256', typ: 'at+jwt', kid: 'synthetic-key' }).sign(new Uint8Array(32));
+  const hmac = await new SignJWT(claims()).setProtectedHeader({ alg: 'HS256', typ: 'JWT', kid: 'synthetic-key' }).sign(new Uint8Array(32));
   for (const value of [hmac, 'invalid', 'a.b.c', 'a'.repeat(16_385), 'eyJhbGciOiJub25lIn0.e30.']) {
     await assert.rejects(h.verifier.verify(value), failure('invalid_token'));
   }
-  assert.deepEqual(new Set(h.requests), new Set([`${config.issuer}.well-known/openid-configuration`, metadata.jwks_uri]));
+  assert.deepEqual(new Set(h.requests), new Set([`${config.issuer}/.well-known/openid-configuration`, metadata.jwks_uri]));
 });
 
 test('unapproved client/owner and forged or foreign identity objects cannot authorize', async () => {
   const h = harness();
   await assert.rejects(h.verifier.verify(await token({ client_id: 'other-client' })), failure('access_denied'));
-  await assert.rejects(h.authenticate(new Headers({ authorization: `Bearer ${await token({ sub: 'auth0|other-user' })}` }), ['tracker:read']), failure('access_denied'));
+  await assert.rejects(h.authenticate(new Headers({ authorization: `Bearer ${await token({ sub: '00000000-0000-4000-8000-000000000003' })}` }), ['tracker:read']), failure('access_denied'));
   const identity = await h.verifier.verify(await token());
   const forged = { ...identity } as VerifiedExternalIdentity;
   await assert.rejects(h.resolver.resolve(forged), failure('access_denied'));
@@ -123,14 +123,17 @@ test('unapproved client/owner and forged or foreign identity objects cannot auth
   await assert.rejects(harness().resolver.resolve(identity), failure('access_denied'));
 });
 
-test('scope checks use verified scope, never permissions; empty or unknown required scopes deny', async () => {
+test('full owner permissions are internal policy, not unsupported OAuth scopes', async () => {
   const h = harness();
-  const identity = await h.verifier.verify(await token({ scope: 'tracker:read', permissions: ['entries:write'] }));
-  assert.throws(() => h.requireScopes(identity, ['entries:write']), failure('insufficient_scope'));
+  const identity = await h.verifier.verify(await token({ scope: 'openid', permissions: [] }));
+  for (const scope of ['tracker:read', 'entries:write', 'entries:delete', 'targets:write'] as const) h.requireScopes(identity, [scope]);
   assert.throws(() => h.requireScopes(identity, []), failure('access_denied'));
   assert.throws(() => h.requireScopes(identity, ['unknown:admin' as never]), failure('access_denied'));
-  const noGrants = await h.verifier.verify(await token({ scope: 'openid offline_access' }));
-  assert.throws(() => h.requireScopes(noGrants, ['tracker:read']), failure('insufficient_scope'));
+  for (const scope of [undefined, '', 'email profile']) {
+    const verified = await h.verifier.verify(await token({ scope }));
+    h.requireScopes(verified, ['entries:write']);
+  }
+  await assert.rejects(h.verifier.verify(await token({ aud: 'authenticated', client_id: undefined })), failure('invalid_token'));
 });
 
 test('metadata issuer/key URL mismatch, network failures and malformed/oversized JWKS deny access', async () => {
@@ -165,7 +168,7 @@ test('unknown key IDs and concurrent requests cannot amplify JWKS network reques
   await Promise.all(Array.from({ length: 10 }, () => h.verifier.verify(good)));
   assert.equal(h.requests.length, 2);
   for (let i = 0; i < 5; i++) {
-    const unknown = await token({}, { alg: 'RS256', typ: 'at+jwt', kid: `unknown-${i}` });
+    const unknown = await token({}, { alg: 'RS256', typ: 'JWT', kid: `unknown-${i}` });
     await assert.rejects(h.verifier.verify(unknown), failure('invalid_token'));
   }
   assert.equal(h.requests.length, 2);
@@ -174,7 +177,7 @@ test('unknown key IDs and concurrent requests cannot amplify JWKS network reques
 test('key rotation refreshes after cooldown and cached identities expire without reuse', async t => {
   const realNow = Date.now;
   let instant = realNow();
-  t.mock.method(Date, 'now', () => instant);
+  t.mock.timers.enable({ apis: ['Date'], now: instant });
   const replacement = await generateKeyPair('RS256');
   const replacementJwk = { ...await exportJWK(replacement.publicKey), kid: 'rotated', alg: 'RS256', use: 'sig' };
   let rotated = false;
@@ -184,8 +187,9 @@ test('key rotation refreshes after cooldown and cached identities expire without
     return Response.json(String(input).endsWith('openid-configuration') ? metadata : { keys: rotated ? [replacementJwk] : [publicKey] });
   });
   const identity = await h.verifier.verify(await token({ exp: Math.floor(instant / 1000) + 1 }));
-  const rotatedToken = await new SignJWT(claims()).setProtectedHeader({ alg: 'RS256', typ: 'at+jwt', kid: 'rotated' }).sign(replacement.privateKey);
+  const rotatedToken = await new SignJWT(claims()).setProtectedHeader({ alg: 'RS256', typ: 'JWT', kid: 'rotated' }).sign(replacement.privateKey);
   instant += 31_000;
+  t.mock.timers.setTime(instant);
   rotated = true;
   await h.verifier.verify(rotatedToken);
   assert.equal(calls, 4);
@@ -221,10 +225,49 @@ test('bearer parser and OAuth responses are generic, uncached and injection-safe
     const challenge = response.headers.get('www-authenticate');
     if (status === 401 || code === 'insufficient_scope') {
       assert(challenge?.includes('resource_metadata="https://synthetic-tracker.vercel.app/.well-known/oauth-protected-resource/mcp"'));
-      assert(challenge?.includes('scope="entries:write"'));
+      assert(challenge?.includes('scope="openid"'));
     } else assert.equal(challenge, null);
     assert.deepEqual(await response.json(), { error: code });
   }
   const response = oauthFailureResponse(new Error('sensitive token'), config, ['tracker:read']);
   assert.deepEqual(await response.json(), { error: 'temporarily_unavailable' });
+});
+
+
+test('Supabase ES256 profile validates with P-256 JWKS and rejects algorithm confusion', async () => {
+  const es = await generateKeyPair('ES256');
+  const key = { ...await exportJWK(es.publicKey), kid: 'es-key', alg: 'ES256', use: 'sig' };
+  const esConfig = { ...config, signingAlgorithm: 'ES256' as const };
+  const h = createOwnerAuthentication(esConfig, async input => Response.json(String(input).endsWith('openid-configuration') ? metadata : { keys: [key] }));
+  const signed = await new SignJWT(claims()).setProtectedHeader({ alg: 'ES256', typ: 'JWT', kid: 'es-key' }).sign(es.privateKey);
+  assert.equal((await h.verifier.verify(signed)).subject, config.ownerUserId);
+  await assert.rejects(h.verifier.verify(await token()), failure('invalid_token'));
+  const invalid = createOwnerAuthentication(esConfig, async input => Response.json(String(input).endsWith('openid-configuration') ? metadata : { keys: [{ ...key, crv: 'P-384' }] }));
+  await assert.rejects(invalid.verifier.verify(signed), failure('temporarily_unavailable'));
+});
+
+
+test('scope-less OAuth issuance and refresh retain every access-token security boundary', async () => {
+  const h = harness();
+  const now = Math.floor(Date.now() / 1000);
+  for (const method of ['oauth_provider/authorization_code', 'token_refresh']) {
+    const base = { scope: undefined, jti: undefined, amr: [{ method, timestamp: now }] };
+    const verified = await h.verifier.verify(await token(base));
+    assert.equal((await h.resolver.resolve(verified)).userId, config.ownerUserId);
+    for (const [override, code] of [
+      [{ aud: 'authenticated' }, 'invalid_token'],
+      [{ aud: config.clientId }, 'invalid_token'],
+      [{ iss: 'https://untrusted.example/auth/v1' }, 'invalid_token'],
+      [{ client_id: undefined }, 'invalid_token'],
+      [{ client_id: '00000000-0000-4000-8000-000000000003' }, 'access_denied'],
+      [{ sub: '00000000-0000-4000-8000-000000000003' }, 'access_denied'],
+      [{ role: 'service_role' }, 'invalid_token'],
+      [{ role: undefined }, 'invalid_token'],
+      [{ exp: now - 1, iat: now - 400 }, 'invalid_token'],
+      [{ is_anonymous: true }, 'invalid_token'],
+    ] as const) await assert.rejects(h.verifier.verify(await token({ ...base, ...override })), failure(code));
+    const wrong = await generateKeyPair('RS256');
+    const forged = await new SignJWT(Object.fromEntries(Object.entries({ ...claims(), ...base }).filter(([, value]) => value !== undefined))).setProtectedHeader({ alg: 'RS256', typ: 'JWT', kid: 'synthetic-key' }).sign(wrong.privateKey);
+    await assert.rejects(h.verifier.verify(forged), failure('invalid_token'));
+  }
 });

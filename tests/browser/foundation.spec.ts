@@ -30,3 +30,18 @@ test('MCP stays disabled even when a caller sends tokens, synthetic writes or fo
     expect(await response.json()).toEqual({ error: 'INTEGRATION_NOT_CONFIGURED' });
   }
 });
+
+test('unconfigured login and consent stay unavailable; credentials and actions fail closed', async ({ page, request }) => {
+  await page.goto('/login');
+  await expect(page.getByRole('heading', { name: 'Owner login' })).toBeVisible();
+  await expect(page.getByText('Authentication is not configured.')).toBeVisible();
+  await expect(page.locator('input[type=password]')).toHaveCount(0);
+  await page.goto('/oauth/consent?authorization_id=synthetic');
+  await expect(page.getByRole('heading', { name: 'Connection unavailable' })).toBeVisible();
+  for (const path of ['/login/submit', '/oauth/consent/submit']) {
+    const response = await request.post(path, { form: { authorization_id: 'synthetic', decision: 'approve', email: 'synthetic@example.invalid', password: 'synthetic-only' } });
+    expect(response.status()).toBe(503);
+    expect(await response.json()).toEqual({ error: 'AUTHENTICATION_NOT_CONFIGURED' });
+    expect(response.headers()['set-cookie']).toBeUndefined();
+  }
+});

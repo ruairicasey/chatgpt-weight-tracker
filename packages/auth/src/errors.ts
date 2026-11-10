@@ -17,10 +17,11 @@ export function checkedScopes(scopes: readonly TrackerScope[]): readonly Tracker
   return Object.freeze([...new Set(scopes)]);
 }
 
-/** Prepared for a future route; Phase 1B.1 does not mount OAuth metadata or MCP. */
+/** Challenges request only a standard scope supported by Supabase. */
 export function oauthFailureResponse(error: unknown, config: OAuthConfig, requiredScopes: readonly TrackerScope[]): Response {
   const trusted = validateOAuthConfig(config);
-  const scopes = checkedScopes(requiredScopes).join(' ');
+  checkedScopes(requiredScopes);
+  const scopes = 'openid';
   const code = error instanceof AuthenticationError ? error.code : 'temporarily_unavailable';
   const status = code === 'temporarily_unavailable' ? 503 : code === 'access_denied' || code === 'insufficient_scope' ? 403 : 401;
   const headers = new Headers({ 'Cache-Control': 'no-store', 'Pragma': 'no-cache' });

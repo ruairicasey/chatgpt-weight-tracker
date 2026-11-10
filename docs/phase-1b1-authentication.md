@@ -1,3 +1,7 @@
+> Historical phase record. Provider/configuration/permission instructions below
+> are superseded by [the Supabase integration](supabase-authentication.md).
+> Do not configure Auth0 or use the historical environment examples.
+
 # ADR 002: Phase 1B.1 secure authentication foundation
 
 Status: implemented locally for review; no hosted OAuth integration. This extends

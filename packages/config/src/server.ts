@@ -1,8 +1,7 @@
 import 'server-only';
 import { z } from 'zod';
 
-const text = z.string().min(1).max(256).regex(/^[\x21-\x7e]+$/);
-const issuer = z.string().regex(/^https:\/\/[a-z0-9][a-z0-9-]*\.(?:[a-z]{2}\.)?auth0\.com\/$/);
+const issuer = z.string().regex(/^https:\/\/[a-z0-9]{20}\.supabase\.co\/auth\/v1$/);
 const resource = z.url().max(2048).refine(value => {
   try {
     const url = new URL(value);
@@ -14,8 +13,8 @@ const resource = z.url().max(2048).refine(value => {
 const schema = z.strictObject({
   issuer,
   audience: resource,
-  clientId: text,
-  ownerSubject: text.refine(value => !value.endsWith('@clients')),
+  clientId: z.uuid(),
+  signingAlgorithm: z.enum(['ES256', 'RS256']).default('ES256'),
   ownerUserId: z.uuid(),
 });
 
@@ -36,14 +35,14 @@ export function validateOAuthConfig(input: unknown): OAuthConfig {
 
 /** Explicit call only; no import-time environment access, defaults or credentials. */
 export function loadOAuthConfig(env: Readonly<Record<string, string | undefined>>): OAuthConfig {
-  if (Object.keys(env).some(key => key.startsWith('NEXT_PUBLIC_') && /AUTH0|MCP_OAUTH|MCP_OWNER|MCP_EXPERIMENT/.test(key))) {
+  if (Object.keys(env).some(key => key.startsWith('NEXT_PUBLIC_') && /SUPABASE|CHATGPT|APP_ORIGIN|MCP_OAUTH|MCP_OWNER|MCP_EXPERIMENT/.test(key))) {
     throw new OAuthConfigurationError();
   }
   return validateOAuthConfig({
     issuer: env.MCP_OAUTH_ISSUER,
     audience: env.MCP_OAUTH_AUDIENCE,
     clientId: env.MCP_OAUTH_CLIENT_ID,
-    ownerSubject: env.MCP_OWNER_SUBJECT,
+    signingAlgorithm: env.MCP_OAUTH_SIGNING_ALGORITHM,
     ownerUserId: env.MCP_OWNER_USER_ID,
   });
 }
@@ -57,4 +56,38 @@ export function loadMcpExperimentConfig(env: Readonly<Record<string, string | un
   const expiresAt = Date.parse(expiry.data);
   if (!Number.isFinite(expiresAt) || expiresAt <= now || expiresAt - now > 86_400_000) throw new OAuthConfigurationError();
   return Object.freeze({ oauth: loadOAuthConfig(env), expiresAt });
+}
+
+const webSchema = z.strictObject({
+  supabaseUrl: z.string().regex(/^https:\/\/[a-z0-9]{20}\.supabase\.co$/),
+  publishableKey: z.string().regex(/^sb_publishable_[A-Za-z0-9_-]{16,256}$/),
+  origin: z.url().refine(value => {
+    try {
+      const url = new URL(value);
+      return url.protocol === 'https:' && !url.username && !url.password && !url.port &&
+        url.pathname === '/' && !url.search && !url.hash && url.origin === value;
+    } catch { return false; }
+  }),
+  callbackUri: z.url().refine(value => {
+    try {
+      const url = new URL(value);
+      return url.origin === 'https://chatgpt.com' && !url.username && !url.password && !url.search && !url.hash && url.href === value &&
+        (url.pathname === '/connector_platform_oauth_redirect' || /^\/connector\/oauth\/[A-Za-z0-9_-]+$/.test(url.pathname));
+    } catch { return false; }
+  }),
+  ownerId: z.uuid(),
+  clientId: z.uuid(),
+});
+export type SupabaseWebConfig = Readonly<z.infer<typeof webSchema>>;
+
+/** Server-only web configuration is independent of experiment activation. */
+export function loadSupabaseWebConfig(env: Readonly<Record<string, string | undefined>>): SupabaseWebConfig {
+  if (Object.keys(env).some(key => key.startsWith('NEXT_PUBLIC_') && /SUPABASE|CHATGPT|APP_ORIGIN|MCP_/.test(key))) throw new OAuthConfigurationError();
+  const result = webSchema.safeParse({ supabaseUrl: env.SUPABASE_URL,
+    publishableKey: env.SUPABASE_PUBLISHABLE_KEY, origin: env.APP_ORIGIN,
+    callbackUri: env.CHATGPT_OAUTH_REDIRECT_URI,
+    ownerId: env.MCP_OWNER_USER_ID, clientId: env.MCP_OAUTH_CLIENT_ID });
+  if (!result.success || env.MCP_OAUTH_ISSUER !== `${result.data.supabaseUrl}/auth/v1` ||
+      env.MCP_OAUTH_AUDIENCE !== `${result.data.origin}/mcp`) throw new OAuthConfigurationError();
+  return Object.freeze(result.data);
 }

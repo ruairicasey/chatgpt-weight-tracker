@@ -63,14 +63,14 @@ export function createMcpExperiment(env: Readonly<Record<string, string | undefi
       description: 'Read a fixed synthetic slot from temporary memory on this server instance. Never supply personal data.',
       inputSchema: ReadProbeSchema,
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-      _meta: { securitySchemes: [{ type: 'oauth2', scopes: ['tracker:read'] }] },
+      _meta: { securitySchemes: [{ type: 'oauth2', scopes: ['openid'] }] },
     }, input => authorize('tracker:read', () => result(store.read(input.slot))));
     server.registerTool('write_probe', {
       title: 'Write synthetic connectivity probe',
       description: 'MUTATION: create a synthetic alpha/beta/gamma record in bounded temporary instance memory. No personal data. Receipts/replay expire after ten minutes or restart.',
       inputSchema: WriteProbeSchema,
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-      _meta: { securitySchemes: [{ type: 'oauth2', scopes: ['entries:write'] }] },
+      _meta: { securitySchemes: [{ type: 'oauth2', scopes: ['openid'] }] },
     }, input => authorize('entries:write', () => {
       const value = store.write(input);
       return result(value, 'error' in value);
@@ -82,7 +82,7 @@ export function createMcpExperiment(env: Readonly<Record<string, string | undefi
     metadata() {
       try { active(); } catch { return inactiveMcpResponse(); }
       return Response.json({ resource: config.oauth.audience, authorization_servers: [config.oauth.issuer],
-        scopes_supported: [...SCOPES], bearer_methods_supported: ['header'],
+        scopes_supported: ['openid'], bearer_methods_supported: ['header'],
         resource_name: 'Synthetic MCP connectivity experiment' }, { headers: { 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*' } });
     },
     async fetch(request: Request): Promise<Response> {

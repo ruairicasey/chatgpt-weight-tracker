@@ -3,10 +3,10 @@ import { exportJWK, generateKeyPair, SignJWT } from 'jose';
 import { createMcpExperiment } from '@weight-tracker/mcp/server';
 
 export const syntheticEnv = {
-  MCP_OAUTH_ISSUER: 'https://synthetic-probe.au.auth0.com/',
+  MCP_OAUTH_ISSUER: 'https://abcdefghijklmnopqrst.supabase.co/auth/v1',
   MCP_OAUTH_AUDIENCE: 'https://synthetic-probe.vercel.app/mcp',
-  MCP_OAUTH_CLIENT_ID: 'synthetic-chatgpt-client',
-  MCP_OWNER_SUBJECT: 'auth0|synthetic-owner',
+  MCP_OAUTH_CLIENT_ID: '00000000-0000-4000-8000-000000000002',
+  MCP_OAUTH_SIGNING_ALGORITHM: 'RS256',
   MCP_OWNER_USER_ID: '00000000-0000-4000-8000-000000000001',
   MCP_EXPERIMENT_ENABLED: 'true',
 };
@@ -19,15 +19,15 @@ export function fixture() {
   const fetcher: typeof fetch = async input => {
     fetches++;
     const url = String(input);
-    if (url === `${env.MCP_OAUTH_ISSUER}.well-known/openid-configuration`) return Response.json({ issuer: env.MCP_OAUTH_ISSUER, jwks_uri: `${env.MCP_OAUTH_ISSUER}.well-known/jwks.json` });
-    if (url === `${env.MCP_OAUTH_ISSUER}.well-known/jwks.json`) return Response.json({ keys: [jwk] });
+    if (url === `${env.MCP_OAUTH_ISSUER}/.well-known/openid-configuration`) return Response.json({ issuer: env.MCP_OAUTH_ISSUER, jwks_uri: `${env.MCP_OAUTH_ISSUER}/.well-known/jwks.json` });
+    if (url === `${env.MCP_OAUTH_ISSUER}/.well-known/jwks.json`) return Response.json({ keys: [jwk] });
     throw new Error('Unexpected external request in test');
   };
   async function token(overrides: Record<string, unknown> = {}) {
     const now = Math.floor(Date.now() / 1000);
-    return new SignJWT({ iss: env.MCP_OAUTH_ISSUER, aud: env.MCP_OAUTH_AUDIENCE, sub: env.MCP_OWNER_SUBJECT,
-      client_id: env.MCP_OAUTH_CLIENT_ID, scope: 'tracker:read entries:write', iat: now, exp: now + 300, jti: randomUUID(), ...overrides,
-    }).setProtectedHeader({ alg: 'RS256', typ: 'at+jwt', kid: 'synthetic-only' }).sign(pair.privateKey);
+    return new SignJWT({ iss: env.MCP_OAUTH_ISSUER, aud: env.MCP_OAUTH_AUDIENCE, sub: env.MCP_OWNER_USER_ID,
+      client_id: env.MCP_OAUTH_CLIENT_ID, scope: 'openid', role: 'authenticated', is_anonymous: false, session_id: randomUUID(), iat: now, exp: now + 300, jti: randomUUID(), ...overrides,
+    }).setProtectedHeader({ alg: 'RS256', typ: 'JWT', kid: 'synthetic-only' }).sign(pair.privateKey);
   }
   const app = createMcpExperiment(env, fetcher);
   function request(body: unknown, bearer?: string, headers: Record<string, string> = {}) {

@@ -9,6 +9,10 @@
     "typecheck": "next typegen && tsc --noEmit"
   },
   "dependencies": {
+    "@supabase/ssr": "0.12.7",
+    "@supabase/supabase-js": "2.119.0",
+    "@weight-tracker/auth": "workspace:*",
+    "@weight-tracker/config": "workspace:*",
     "@weight-tracker/contracts": "workspace:*",
     "@weight-tracker/mcp": "workspace:*",
     "next": "16.4.5",
