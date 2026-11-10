@@ -16,4 +16,3 @@ export async function supabaseServer(config: SupabaseWebConfig, writable = false
     },
   });
 }
-
