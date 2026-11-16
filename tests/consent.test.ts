@@ -73,6 +73,8 @@ test('CSRF, open redirects, duplicate IDs and injected authorization IDs are rej
   assert.equal(consentRedirect(`${config.callbackUri}?code=synthetic&state=synthetic`, config), `${config.callbackUri}?code=synthetic&state=synthetic`);
   for (const url of ['//evil.example', 'javascript:alert(1)', 'https://chatgpt.com@evil.example', `${config.callbackUri}/extra`, `${config.callbackUri}#fragment`, 'https://chatgpt.com/connector/oauth/other']) assert.throws(() => consentRedirect(url, config));
   for (const value of [undefined, ['one', 'two'], '../../evil', '<script>', 'x'.repeat(129)]) assert.throws(() => authorizationId(value));
+  assert.equal(loginDestination(null), '/dashboard');
+  assert.equal(loginDestination(''), '/dashboard');
   assert.equal(loginDestination(id), `/oauth/consent?authorization_id=${id}`);
   assert.throws(() => loginDestination('https://evil.example'));
 });
