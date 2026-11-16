@@ -51,11 +51,8 @@ export type McpExperimentConfig = Readonly<{ oauth: OAuthConfig; expiresAt: numb
 
 /** No default activation. A fixed UTC/offset deadline may be at most 24h away. */
 export function loadMcpExperimentConfig(env: Readonly<Record<string, string | undefined>>, now = Date.now()): McpExperimentConfig {
-  const expiry = z.iso.datetime({ offset: true }).safeParse(env.MCP_EXPERIMENT_EXPIRES_AT);
-  if (env.MCP_EXPERIMENT_ENABLED !== 'true' || !expiry.success) throw new OAuthConfigurationError();
-  const expiresAt = Date.parse(expiry.data);
-  if (!Number.isFinite(expiresAt) || expiresAt <= now || expiresAt - now > 86_400_000) throw new OAuthConfigurationError();
-  return Object.freeze({ oauth: loadOAuthConfig(env), expiresAt });
+  if (env.MCP_PRODUCTION_ENABLED !== 'true') throw new OAuthConfigurationError();
+  return Object.freeze({ oauth: loadOAuthConfig(env), expiresAt: Number.MAX_SAFE_INTEGER });
 }
 
 const webSchema = z.strictObject({
