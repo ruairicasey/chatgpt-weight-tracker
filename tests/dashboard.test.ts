@@ -14,7 +14,7 @@ test('default day uses Melbourne local date across UTC and daylight-saving bound
 });
 
 test('food totals reflect every entry; optional body fat is never substituted with zero', () => {
-  assert.deepEqual(foodTotals([]), { calories: 0, protein_g: 0 });
+  assert.deepEqual(foodTotals([]), { calories: 0, proteinG: 0 });
   assert.deepEqual(foodTotals([
     { calories: 288, protein_g: 25.2 }, { calories: 190, protein_g: 6.5 },
     { calories: 220, protein_g: 0 },
