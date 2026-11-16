@@ -72,6 +72,6 @@ test('migration grants CRUD only under owner-scoped RLS and no anon table grants
       assert.ok(sql.includes(`create policy ${table === 'weight_entries' ? 'weight' : 'food'}_owner_${action}`));
     }
   }
-  assert.match(sql, /with check \\(owner_id = \\(select auth\\.uid\\(\\)\\)\\)/);
-  assert.match(sql, /revoke all on public\\.weight_entries, public\\.food_entries from anon/);
+  assert.ok(sql.includes('with check (owner_id = (select auth.uid()))'));
+  assert.ok(sql.includes('revoke all on public.weight_entries, public.food_entries from anon'));
 });
