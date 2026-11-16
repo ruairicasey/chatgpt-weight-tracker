@@ -12,7 +12,7 @@ export default async function Dashboard({ searchParams }: {
 }) {
   let config;
   try { config = loadSupabaseWebConfig(process.env); }
-  catch { return <main><h1>Dashboard unavailable</h1><p>Authentication is not configured.</p></main>; }
+  catch { redirect('/login'); }
 
   const supabase = await supabaseServer(config);
   const { data: { user }, error } = await supabase.auth.getUser();
