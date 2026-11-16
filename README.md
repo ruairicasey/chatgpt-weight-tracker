@@ -5,23 +5,26 @@ private PostgreSQL storage and a private web dashboard. **Additional operating
 cost must remain $0.** Only ongoing Free/Hobby plans are permitted; no trials,
 usage billing, paid domains, automatic upgrades or additional model APIs.
 
-## Current status: Supabase authentication integration (MCP disabled)
+## Current status: owner-only tracker MVP (default-disabled MCP)
 
 The two planned services are **Vercel Hobby** and **Supabase Free**, alongside the
 owner's existing ChatGPT Plus subscription. No separate OAuth provider is selected.
 
-Supabase-specific JWT verification, owner authorization, login/consent pages and a
-reviewed token-hook migration are implemented for review. The official SDK v2
-synthetic MCP probes remain disabled without complete configuration, explicit
-activation and an unexpired deadline. No hosted setup or OAuth has been tested.
-There are no tracker records, database runtime connections or tracker features.
+Supabase JWT verification, owner authorization and login/consent pages support the
+existing production configuration. Five owner-only MCP tools now provide weight
+and food logging, daily views, corrections and deletions through a server-only
+Data API client and PostgreSQL RLS. Production MCP is **off by default** until
+`MCP_PRODUCTION_ENABLED=true` is set on Vercel Production and redeployed.
+The tracker migration must be applied manually in Supabase before activation.
+Custom-audience token Data API use and refresh require live validation.
+See `docs/data-api-rls-phase.md` for exact rollout and rollback steps.
 
 Read [the current architecture](docs/architecture.md) and
 [Supabase setup, compatibility gates and rollback](docs/supabase-authentication.md).
 Historical phase documents describe superseded authentication choices.
 
-The owner verified unauthenticated read/write execution, idempotent replay and
-new-chat readback on their ChatGPT Plus account during Phase 0. OAuth and durable
+The owner verified synthetic connectivity in ChatGPT during Phase 0. The production
+owner-authenticated tracker workflow still requires live validation. OAuth and durable
 persistence remain unverified. See [the preserved reference](references/README.md).
 
 ## Local development
@@ -89,7 +92,7 @@ and have read-only repository permissions.
 | `packages/auth` | Principal types plus server-only JWT verification and owner/scope resolution |
 | `packages/mcp` | Server-only stateless SDK v2 adapter, activation gate and synthetic probes |
 | `packages/domain` | Use-case/transaction boundaries; no tracker implementations |
-| `packages/db` | Drizzle/Postgres types only; authentication hook migration under `supabase/` |
+| `packages/db` | Database boundaries; owner-scoped tracker migration under `supabase/` |
 | `references/phase0` | Original disposable probe, excluded from active workspace/build |
 
 Shared packages are private source packages, not published npm packages. No
