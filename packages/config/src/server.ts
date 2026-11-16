@@ -35,7 +35,7 @@ export function validateOAuthConfig(input: unknown): OAuthConfig {
 
 /** Explicit call only; no import-time environment access, defaults or credentials. */
 export function loadOAuthConfig(env: Readonly<Record<string, string | undefined>>): OAuthConfig {
-  if (Object.keys(env).some(key => key.startsWith('NEXT_PUBLIC_') && /SUPABASE|CHATGPT|APP_ORIGIN|MCP_OAUTH|MCP_OWNER|MCP_EXPERIMENT/.test(key))) {
+  if (Object.keys(env).some(key => key.startsWith('NEXT_PUBLIC_') && /SUPABASE|CHATGPT|APP_ORIGIN|MCP_OAUTH|MCP_OWNER|MCP_EXPERIMENT|MCP_PRODUCTION/.test(key))) {
     throw new OAuthConfigurationError();
   }
   return validateOAuthConfig({
