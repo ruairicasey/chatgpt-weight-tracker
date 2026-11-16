@@ -30,6 +30,13 @@ test('web configuration requires canonical Supabase, callback and resource witho
 test('consent requires exact owner, approved client, authorization ID and callback; OIDC is not CRUD permission', () => {
   requireWebOwner({ id: config.ownerId, is_anonymous: false }, config);
   requireConsentDetails(details, config, id);
+  // ChatGPT adds offline_access to its authorization request for token renewal.
+  // This is not an application CRUD permission; owner/client/callback checks still apply.
+  requireConsentDetails({ ...details, scope: 'openid email offline_access' }, config, id);
+  requireConsentDetails({ ...details, scope: 'offline_access openid' }, config, id);
+  for (const scope of ['offline_access', 'openid entries:write offline_access', 'openid admin', 'openid  email offline_access']) {
+    assert.throws(() => requireConsentDetails({ ...details, scope }, config, id));
+  }
   for (const user of [null, { id: config.ownerId, is_anonymous: true }, { id: config.ownerId }, { id: 'other', is_anonymous: false }]) assert.throws(() => requireWebOwner(user, config));
   for (const override of [
     { client: { id: 'other' } }, { user: { id: 'other' } }, { authorization_id: 'other' },
@@ -37,6 +44,27 @@ test('consent requires exact owner, approved client, authorization ID and callba
   ]) assert.throws(() => requireConsentDetails({ ...details, ...override }, config, id));
   // An already-consented redirect does not authorize a fresh approval POST.
   assert.throws(() => requireConsentDetails({ redirect_url: config.callbackUri }, config, id));
+});
+
+test('ChatGPT offline_access consent still requires exact owner and client before approval', async () => {
+  let approvals = 0;
+  const chatgptDetails = { ...details, scope: 'openid email offline_access' };
+  const provider = {
+    async owner() { return { id: config.ownerId, is_anonymous: false }; },
+    async details() { return chatgptDetails; },
+    async decide() { approvals++; return `${config.callbackUri}?code=synthetic&state=synthetic`; },
+  };
+  assert.equal(await executeConsentDecision({ origin: config.origin, id, decision: 'approve' }, config, provider),
+    `${config.callbackUri}?code=synthetic&state=synthetic`);
+  assert.equal(approvals, 1);
+  for (const field of ['client', 'user', 'redirect_uri', 'scope'] as const) {
+    const invalid = { ...chatgptDetails, [field]: field === 'client' ? { id: 'unapproved' }
+      : field === 'user' ? { id: 'unknown' }
+      : field === 'redirect_uri' ? 'https://evil.example/callback' : 'openid offline_access admin' };
+    await assert.rejects(executeConsentDecision({ origin: config.origin, id, decision: 'approve' }, config,
+      { ...provider, async details() { return invalid; } }));
+    assert.equal(approvals, 1);
+  }
 });
 
 test('CSRF, open redirects, duplicate IDs and injected authorization IDs are rejected', () => {
