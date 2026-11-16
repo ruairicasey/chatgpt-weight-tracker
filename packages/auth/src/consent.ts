@@ -31,7 +31,7 @@ export function requireConsentDetails(value: unknown, config: SupabaseWebConfig,
 }
 /** No caller-controlled return URLs; preserve only a bounded authorization ID. */
 export function loginDestination(id: unknown) {
-  return id === null || id === undefined || id === '' ? '/login?success=1' : `/oauth/consent?authorization_id=${authorizationId(id)}`;
+  return id === null || id === undefined || id === '' ? '/dashboard' : `/oauth/consent?authorization_id=${authorizationId(id)}`;
 }
 
 export interface ConsentProvider {
