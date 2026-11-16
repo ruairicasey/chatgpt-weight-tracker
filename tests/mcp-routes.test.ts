@@ -22,7 +22,7 @@ test('App Router exports use the gated, authenticated gateway for MCP and both m
   assert.equal((await route.POST(h.request(toolCall('read_probe', { slot: 'synthetic-1' })))).status, 401);
   const body = await rpc(await route.POST(h.request(toolCall('read_probe', { slot: 'synthetic-1' }), await h.token())));
   assert.equal((body.result as { structuredContent: { found: boolean } }).structuredContent.found, false);
-  process.env.MCP_EXPERIMENT_ENABLED = 'false';
+  process.env.MCP_PRODUCTION_ENABLED = 'false';
   assert.equal((await route.POST(h.request({}))).status, 503);
   assert.equal(metadata.GET().status, 503);
 });
