@@ -27,7 +27,7 @@ export function requireConsentDetails(value: unknown, config: SupabaseWebConfig,
       value.client.id !== config.clientId || !record(value.user) || value.user.id !== config.ownerId ||
       value.redirect_uri !== config.callbackUri || typeof value.scope !== 'string') throw denied();
   const scopes = value.scope.split(' ');
-  if (!scopes.includes('openid') || scopes.some(scope => !['openid', 'email', 'profile', 'phone'].includes(scope))) throw denied();
+  if (!scopes.includes('openid') || scopes.some(scope => !['openid', 'email', 'profile', 'phone', 'offline_access'].includes(scope))) throw denied();
 }
 /** No caller-controlled return URLs; preserve only a bounded authorization ID. */
 export function loginDestination(id: unknown) {
