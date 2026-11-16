@@ -49,8 +49,8 @@ export function loadOAuthConfig(env: Readonly<Record<string, string | undefined>
 
 export type McpExperimentConfig = Readonly<{ oauth: OAuthConfig; expiresAt: number }>;
 
-/** No default activation. A fixed UTC/offset deadline may be at most 24h away. */
-export function loadMcpExperimentConfig(env: Readonly<Record<string, string | undefined>>, now = Date.now()): McpExperimentConfig {
+/** Fail closed unless explicitly enabled in the production server environment. */
+export function loadMcpExperimentConfig(env: Readonly<Record<string, string | undefined>>): McpExperimentConfig {
   if (env.MCP_PRODUCTION_ENABLED !== 'true') throw new OAuthConfigurationError();
   return Object.freeze({ oauth: loadOAuthConfig(env), expiresAt: Number.MAX_SAFE_INTEGER });
 }
