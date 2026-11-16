@@ -5,6 +5,7 @@ import { loadMcpExperimentConfig } from '@weight-tracker/config/server';
 import type { TrackerScope } from '@weight-tracker/contracts';
 import type { VerifiedPrincipal } from '@weight-tracker/auth';
 import { createProbeStore, ReadProbeSchema, WriteProbeSchema } from './probes';
+import { trackerApi, LogWeight, LogFood, ViewDay, CorrectEntry, DeleteEntry } from './tracker';
 
 const METHODS = new Set(['initialize', 'notifications/initialized', 'ping', 'server/discover', 'tools/list', 'tools/call']);
 const SCOPES = ['tracker:read', 'entries:write'] as const;
@@ -41,20 +42,20 @@ export function createMcpExperiment(env: Readonly<Record<string, string | undefi
       throw new AuthenticationError('temporarily_unavailable');
     }
   }
-  function tools(principal: VerifiedPrincipal) {
+  function tools(principal: VerifiedPrincipal, accessToken: string) {
     const server = new McpServer({ name: 'weight-tracker-synthetic-probe', version: '0.1.0' }, {
       maxToolInputElements: 16,
       supportedProtocolVersions: [...VERSIONS],
     });
-    const authorize = (scope: TrackerScope, work: () => CallToolResult): CallToolResult => {
+    const authorize = async (scope: TrackerScope, work: () => CallToolResult | Promise<CallToolResult>): Promise<CallToolResult> => {
       try {
         active();
         authentication.requireScopes(principal.identity, [scope]);
-        return work();
+        return await work();
       } catch (error) {
         const response = oauthFailureResponse(error, config.oauth, [scope]);
         const challenge = response.headers.get('WWW-Authenticate');
-        return { ...result({ error: error instanceof AuthenticationError ? error.code : 'temporarily_unavailable' }, true),
+        return { ...result({ error: error instanceof AuthenticationError ? error.code : error instanceof Error ? error.message : 'SERVICE_UNAVAILABLE' }, true),
           ...(challenge ? { _meta: { 'mcp/www_authenticate': [challenge] } } : {}) };
       }
     };
@@ -75,6 +76,28 @@ export function createMcpExperiment(env: Readonly<Record<string, string | undefi
       const value = store.write(input);
       return result(value, 'error' in value);
     }));
+    const api = () => trackerApi(env, accessToken, principal.userId, fetcher);
+    const secure = { _meta: { securitySchemes: [{ type: 'oauth2' as const, scopes: ['openid'] }] } };
+    server.registerTool('log_weight', {
+      title: 'Log weight', description: 'MUTATION: log a weight in kilograms for a Melbourne calendar date; only one per day.',
+      inputSchema: LogWeight, annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false }, ...secure,
+    }, input => authorize('entries:write', async () => result({ entries: await api().logWeight(input) })));
+    server.registerTool('log_food', {
+      title: 'Log food', description: 'MUTATION: log a food entry with calories and protein grams for a Melbourne date.',
+      inputSchema: LogFood, annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false }, ...secure,
+    }, input => authorize('entries:write', async () => result({ entries: await api().logFood(input) })));
+    server.registerTool('view_day', {
+      title: 'View a day', description: 'Read weight and food entries for a Melbourne calendar date.',
+      inputSchema: ViewDay, annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }, ...secure,
+    }, input => authorize('tracker:read', async () => result(await api().viewDay(input.date))));
+    server.registerTool('correct_entry', {
+      title: 'Correct an entry', description: 'MUTATION: correct weight or food using ID and expected revision. Stale changes are rejected.',
+      inputSchema: CorrectEntry, annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false }, ...secure,
+    }, input => authorize('entries:write', async () => result({ entries: await api().correct(input) })));
+    server.registerTool('delete_entry', {
+      title: 'Delete an entry', description: 'DESTRUCTIVE MUTATION: permanently delete a weight or food entry by ID and expected revision.',
+      inputSchema: DeleteEntry, annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false }, ...secure,
+    }, input => authorize('entries:delete', async () => result(await api().remove(input))));
     return server;
   }
 
@@ -94,8 +117,10 @@ export function createMcpExperiment(env: Readonly<Record<string, string | undefi
           (request.headers.has('host') && request.headers.get('host') !== new URL(origin).host) ||
           (request.headers.has('origin') && request.headers.get('origin') !== origin)) return json('FORBIDDEN_ORIGIN', 403);
       let principal: VerifiedPrincipal;
+      let accessToken: string;
       try {
-        const identity = await authentication.verifier.verify(bearerToken(request.headers));
+        accessToken = bearerToken(request.headers);
+        const identity = await authentication.verifier.verify(accessToken);
         principal = await authentication.resolver.resolve(identity);
         if (!SCOPES.some(scope => identity.scopes.includes(scope))) authentication.requireScopes(identity, ['tracker:read']);
         active();
@@ -114,7 +139,7 @@ export function createMcpExperiment(env: Readonly<Record<string, string | undefi
       const method = (parsedBody as { method?: unknown }).method;
       if (typeof method !== 'string' || !METHODS.has(method)) return json('METHOD_NOT_ALLOWED', 400);
       // No sessions, subscriptions, callbacks, background work or caller authInfo.
-      const handler = createMcpHandler(() => tools(principal), {
+      const handler = createMcpHandler(() => tools(principal, accessToken), {
         legacy: 'stateless', responseMode: 'auto', maxRequestBodySize: MAX_BODY, maxSubscriptions: 0, keepAliveMs: 0,
       });
       try { return uncached(await handler.fetch(request, { parsedBody })); }

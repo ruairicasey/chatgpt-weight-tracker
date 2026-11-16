@@ -6,20 +6,20 @@ import { createMcpExperiment, createMcpGateway } from '@weight-tracker/mcp/serve
 import { loadMcpExperimentConfig, OAuthConfigurationError } from '@weight-tracker/config/server';
 import { fixture, rpc, toolCall } from './helpers/mcp.js';
 
-test('activation requires complete config, exact opt-in and a future deadline of at most 24h', () => {
+test('production MCP requires the explicit enable flag and complete owner config', () => {
   const h = fixture();
   for (const override of [
-    { MCP_EXPERIMENT_ENABLED: undefined }, { MCP_EXPERIMENT_ENABLED: 'TRUE' },
-    { MCP_EXPERIMENT_EXPIRES_AT: undefined }, { MCP_EXPERIMENT_EXPIRES_AT: 'invalid' },
-    { MCP_EXPERIMENT_EXPIRES_AT: '2026-11-10T12:00:00+99:99' },
-    { MCP_EXPERIMENT_EXPIRES_AT: new Date(Date.now() - 1).toISOString() },
-    { MCP_EXPERIMENT_EXPIRES_AT: new Date(Date.now() + 86_401_000).toISOString() },
-    { MCP_OWNER_USER_ID: undefined }, { NEXT_PUBLIC_MCP_EXPERIMENT_ENABLED: 'true' },
+    { MCP_PRODUCTION_ENABLED: undefined },
+    { MCP_PRODUCTION_ENABLED: 'TRUE' },
+    { MCP_PRODUCTION_ENABLED: 'false' },
+    { MCP_OWNER_USER_ID: undefined },
+    { NEXT_PUBLIC_MCP_PRODUCTION_ENABLED: 'true' },
   ]) assert.throws(() => loadMcpExperimentConfig({ ...h.env, ...override }), OAuthConfigurationError);
-  assert(loadMcpExperimentConfig(h.env).expiresAt > Date.now());
+  assert.equal(loadMcpExperimentConfig(h.env).expiresAt, Number.MAX_SAFE_INTEGER);
+  assert.equal(loadMcpExperimentConfig({ ...h.env, MCP_EXPERIMENT_ENABLED: 'true', MCP_EXPERIMENT_EXPIRES_AT: 'bad' }).expiresAt, Number.MAX_SAFE_INTEGER);
 });
 
-test('protected resource metadata is canonical, minimal and unauthenticated, and expires', async t => {
+test('protected resource metadata is canonical, minimal and disabled by configuration', async () => {
   const h = fixture();
   const response = h.app.metadata();
   assert.equal(response.status, 200);
@@ -27,14 +27,14 @@ test('protected resource metadata is canonical, minimal and unauthenticated, and
   assert.deepEqual(await response.json(), { resource: h.env.MCP_OAUTH_AUDIENCE, authorization_servers: [h.env.MCP_OAUTH_ISSUER],
     scopes_supported: ['openid'], bearer_methods_supported: ['header'], resource_name: 'Synthetic MCP connectivity experiment' });
   assert.equal(h.fetches(), 0);
-  t.mock.method(Date, 'now', () => Date.parse(h.env.MCP_EXPERIMENT_EXPIRES_AT) + 1);
-  assert.equal(h.app.metadata().status, 503);
-  assert.equal((await h.app.fetch(h.request({}))).status, 503);
+  const disabled = createMcpGateway(() => ({ ...h.env, MCP_PRODUCTION_ENABLED: 'false' }), h.fetcher);
+  assert.equal(disabled.metadata().status, 503);
+  assert.equal((await disabled.fetch(h.request({}))).status, 503);
 });
 
 test('gateway checks every request configuration and discards state after disablement or owner changes', async () => {
   const h = fixture();
-  let env: Record<string, string | undefined> = { ...h.env, MCP_EXPERIMENT_ENABLED: undefined };
+  let env: Record<string, string | undefined> = { ...h.env, MCP_PRODUCTION_ENABLED: undefined };
   const gateway = createMcpGateway(() => env, h.fetcher);
   assert.equal(gateway.metadata().status, 503);
   assert.equal((await gateway.fetch(h.request({}))).status, 503);
@@ -83,7 +83,7 @@ for (const protocolVersion of ['2025-03-26', '2025-06-18', '2025-11-25']) test(`
   const headers = { 'MCP-Protocol-Version': protocolVersion };
   const list = await rpc(await h.app.fetch(h.request({ jsonrpc: '2.0', id: 2, method: 'tools/list' }, bearer, headers)));
   const tools = (list.result as { tools: Array<{ name: string; annotations: { readOnlyHint: boolean }; _meta: unknown }> }).tools;
-  assert.deepEqual(tools.map(tool => tool.name), ['read_probe', 'write_probe']);
+  assert.deepEqual(tools.map(tool => tool.name), ['read_probe', 'write_probe', 'log_weight', 'log_food', 'view_day', 'correct_entry', 'delete_entry']);
   assert.equal(tools[0]?.annotations.readOnlyHint, true);
   assert.equal(tools[1]?.annotations.readOnlyHint, false);
   assert.deepEqual(tools[1]?._meta, { securitySchemes: [{ type: 'oauth2', scopes: ['openid'] }] });
@@ -102,7 +102,7 @@ for (const mode of ['legacy', 'auto'] as const) test(`official v2 client ${mode}
   t.after(() => client.close());
   await client.connect(transport);
   assert.equal(client.getProtocolEra(), mode === 'auto' ? 'modern' : 'legacy');
-  assert.equal((await client.listTools()).tools.length, 2);
+  assert.equal((await client.listTools()).tools.length, 7);
   const result = await client.callTool({ name: 'read_probe', arguments: { slot: 'synthetic-1' } });
   assert.equal((result.structuredContent as { found: boolean }).found, false);
   const write = await client.callTool({ name: 'write_probe', arguments: { slot: 'synthetic-1', value: 'alpha', operationKey: randomUUID() } });
