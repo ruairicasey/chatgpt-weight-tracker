@@ -8,13 +8,13 @@ export const syntheticEnv = {
   MCP_OAUTH_CLIENT_ID: '00000000-0000-4000-8000-000000000002',
   MCP_OAUTH_SIGNING_ALGORITHM: 'RS256',
   MCP_OWNER_USER_ID: '00000000-0000-4000-8000-000000000001',
-  MCP_EXPERIMENT_ENABLED: 'true',
+  MCP_PRODUCTION_ENABLED: 'true',
 };
 const pair = await generateKeyPair('RS256');
 const jwk = { ...await exportJWK(pair.publicKey), use: 'sig', alg: 'RS256', kid: 'synthetic-only' };
 
 export function fixture() {
-  const env = { ...syntheticEnv, MCP_EXPERIMENT_EXPIRES_AT: new Date(Date.now() + 3_600_000).toISOString() };
+  const env = { ...syntheticEnv };
   let fetches = 0;
   const fetcher: typeof fetch = async input => {
     fetches++;
