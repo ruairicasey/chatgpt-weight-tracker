@@ -11,3 +11,17 @@ test('dashboard redirects to login when no owner session is configured', async (
   await page.goto('/dashboard');
   await expect(page).toHaveURL(/\/login$/);
 });
+
+test('week and month views also require sign-in', async ({ page }) => {
+  for (const view of ['week', 'month']) {
+    await page.goto(`/dashboard?view=${view}`);
+    await expect(page).toHaveURL(/\/login$/);
+  }
+});
+
+test('sign-out only accepts same-origin POSTs and never signs out via GET', async ({ request }) => {
+  const crossSite = await request.post('/logout', { headers: { Origin: 'https://evil.example' }, maxRedirects: 0 });
+  expect([403, 503]).toContain(crossSite.status());
+  const get = await request.get('/logout', { maxRedirects: 0 });
+  expect(get.status()).toBe(405);
+});

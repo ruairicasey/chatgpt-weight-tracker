@@ -38,6 +38,35 @@ export function foodTotals(foods: ReadonlyArray<Pick<FoodRow, 'calories' | 'prot
   }), { calories: 0, proteinG: 0 });
 }
 
+/** Everything needed to summarise a date range (week or month grid), read under owner RLS. */
+export async function readRange(client: SupabaseClient, from: string, to: string) {
+  const pageSize = 500;
+  async function all<T>(table: string, columns: string, errorCode: string): Promise<T[]> {
+    const rows: T[] = [];
+    for (let offset = 0;; offset += pageSize) {
+      const page = await client.from(table).select(columns)
+        .gte('entry_date', from).lte('entry_date', to)
+        .order('entry_date', { ascending: true }).order('id', { ascending: true })
+        .range(offset, offset + pageSize - 1);
+      if (page.error) throw new Error(errorCode);
+      const batch = (page.data ?? []) as T[];
+      rows.push(...batch);
+      if (batch.length < pageSize) break;
+    }
+    return rows;
+  }
+  const targetResponse = await client.from('daily_targets')
+    .select('effective_from,calorie_target,protein_target_g')
+    .lte('effective_from', to).order('effective_from', { ascending: true }).limit(1000);
+  if (targetResponse.error) throw new Error('TARGETS_READ_FAILED');
+  return {
+    foods: await all<Pick<FoodRow, 'entry_date' | 'calories' | 'protein_g'>>('food_entries', 'id,entry_date,calories,protein_g', 'FOOD_READ_FAILED'),
+    exercises: await all<Pick<ExerciseRow, 'entry_date' | 'duration_minutes' | 'calories_burned'>>('exercise_entries', 'id,entry_date,duration_minutes,calories_burned', 'EXERCISE_READ_FAILED'),
+    weights: await all<Pick<WeightRow, 'entry_date' | 'weight_kg'>>('weight_entries', 'id,entry_date,weight_kg', 'WEIGHT_READ_FAILED'),
+    targets: (targetResponse.data ?? []) as DailyTarget[],
+  };
+}
+
 // PostgREST defaults to a maximum page size. Fetch every weight from the first entry,
 // not merely the most recent 1000; all requests use the owner's cookie session and RLS.
 export async function readDashboard(client: SupabaseClient, date: string) {
