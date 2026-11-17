@@ -51,3 +51,82 @@ footer { border-top: 1px solid #d7dbcd; padding-top: 22px; color: var(--muted); 
 .legend-average { color: #718969; }
 .trend-summary { color: var(--muted); font-size: 14px; margin-bottom: 8px; }
 .trend-summary strong { color: var(--ink); }
+
+/* Dashboard v2: tabs, navigation, progress bars, week/month views */
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.link-button { background: none; border: 1px solid #c9cfc0; border-radius: 6px; padding: 7px 12px; font: inherit; font-size: 14px; color: var(--ink); cursor: pointer; }
+.link-button:hover { background: #eaece1; }
+.dashboard-bar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+.dashboard-hint { margin: 0; color: var(--muted); font-size: 13px; }
+.view-tabs { display: inline-flex; background: #e8ebe1; border-radius: 10px; padding: 4px; gap: 2px; }
+.view-tabs a { padding: 8px 18px; border-radius: 7px; text-decoration: none; color: var(--muted); font-weight: 600; font-size: 14px; }
+.dashboard .view-tabs a { color: var(--muted); }
+.dashboard .view-tabs a.active { background: #fffdf8; color: var(--ink); box-shadow: 0 1px 2px rgba(38,56,46,.12); }
+.period-nav { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
+.period-label { font-family: Georgia, 'Times New Roman', serif; font-weight: normal; font-size: 24px; min-width: 0; }
+.nav-arrow { display: grid; place-items: center; width: 36px; height: 36px; border: 1px solid #c9cfc0; border-radius: 8px; text-decoration: none; font-size: 18px; background: white; }
+.dashboard .nav-arrow { color: var(--ink); }
+.today-link { font-size: 14px; font-weight: 600; }
+.period-nav .date-form { margin-left: auto; }
+.metric small { font-size: 13px; color: var(--muted); font-weight: 500; }
+.metric strong small { font-size: 60%; color: var(--muted); font-weight: 500; }
+.target-pending { color: var(--muted); font-weight: 600; }
+.bar { height: 8px; border-radius: 99px; background: #e2e6da; overflow: hidden; }
+.bar span { display: block; height: 100%; border-radius: inherit; background: #4f7a5a; }
+.bar-over span { background: #b5473b; }
+.chart-placeholder { padding: 28px; border: 1px dashed #cfd5c6; border-radius: 10px; color: var(--muted); text-align: center; margin: 0 0 18px; }
+
+.period-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 18px; }
+.week-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 10px; }
+.day-card { display: flex; flex-direction: column; gap: 8px; min-height: 150px; padding: 12px; border-radius: 10px; border: 1px solid #e3e7dd; border-top: 4px solid #d6dbcf; background: #fbfcf8; text-decoration: none; color: var(--ink); transition: transform .1s ease, box-shadow .1s ease; }
+.dashboard a.day-card { color: var(--ink); }
+.day-card:hover { transform: translateY(-1px); box-shadow: 0 3px 10px rgba(38,56,46,.1); }
+.day-card-date { font-size: 13px; color: var(--muted); font-weight: 600; }
+.day-card-kcal { font-size: 20px; font-weight: 700; }
+.day-card-kcal small { font-size: 12px; color: var(--muted); font-weight: 500; }
+.day-card-protein { font-size: 12px; color: var(--muted); }
+.day-card-protein.hit { color: #336442; font-weight: 600; }
+.day-card-extra { margin-top: auto; display: flex; flex-wrap: wrap; gap: 6px; font-size: 12px; color: var(--muted); }
+.day-card-extra span { background: #eef1e8; border-radius: 99px; padding: 2px 8px; }
+.day-card-empty { color: #b3b9ab; font-size: 20px; }
+.day-card.is-today { outline: 2px solid var(--ink); outline-offset: 1px; }
+.status-on { border-top-color: #4f7a5a; background: #f1f6ef; }
+.status-close { border-top-color: #c99a2e; background: #fbf6e8; }
+.status-over { border-top-color: #b5473b; background: #fbf0ee; }
+.status-future { opacity: .55; }
+.out-of-focus { opacity: .35; }
+.status-legend { display: flex; flex-wrap: wrap; gap: 16px; font-size: 12px; color: var(--muted); margin: 16px 0 0; }
+.status-legend span::before { content: ''; display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.status-legend .status-on, .status-legend .status-close, .status-legend .status-over, .status-legend .status-empty { background: none; }
+.status-legend .status-on::before { background: #4f7a5a; }
+.status-legend .status-close::before { background: #c99a2e; }
+.status-legend .status-over::before { background: #b5473b; }
+.status-legend .status-empty::before { background: #d6dbcf; }
+
+.month-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+.month-weekday { font-size: 12px; color: var(--muted); font-weight: 600; text-align: center; padding-bottom: 4px; }
+.day-card.compact { min-height: 74px; padding: 8px; gap: 4px; border-top-width: 3px; }
+.day-card.compact .day-card-kcal { font-size: 15px; }
+.day-card.compact .day-card-empty { font-size: 15px; }
+.day-card-dots { display: flex; gap: 4px; margin-top: auto; }
+.dot-weight, .dot-exercise { display: inline-block; width: 7px; height: 7px; border-radius: 50%; }
+.dot-weight { background: #26382e; }
+.dot-exercise { background: #6d8fb3; }
+.month-key { grid-column: 1 / -1; font-size: 12px; color: var(--muted); margin: 8px 0 0; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+
+@media (max-width: 900px) {
+  .week-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .period-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 560px) {
+  .week-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .day-card { min-height: 130px; }
+  .period-nav .date-form { margin-left: 0; width: 100%; }
+  .period-label { font-size: 20px; }
+  .dashboard-hint { display: none; }
+  .month-grid { gap: 3px; }
+  .day-card.compact { min-height: 54px; padding: 5px 4px; border-radius: 6px; }
+  .day-card.compact .day-card-kcal, .day-card.compact .day-card-empty { font-size: 12px; }
+  .day-card.compact .day-card-date { font-size: 11px; }
+  .view-tabs a { padding: 7px 14px; }
+}

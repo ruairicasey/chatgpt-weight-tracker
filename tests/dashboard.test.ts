@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { melbourneToday, selectedDate, foodTotals, readDashboard } from '../apps/web/lib/dashboard-data';
+import { melbourneToday, selectedDate, foodTotals, readDashboard, readRange } from '../apps/web/lib/dashboard-data';
 
 test('default day uses Melbourne local date across UTC and daylight-saving boundaries', () => {
   assert.equal(melbourneToday(new Date('2026-11-16T13:30:00Z')), '2026-11-17');
@@ -71,6 +71,34 @@ test('dashboard reads one owner-session day, food totals and all paginated weigh
   assert.deepEqual(calls[3]?.eq, ['entry_date', '2026-11-17']);
   assert.deepEqual(calls[4]?.range, [0, 499]);
   assert.deepEqual(calls[5]?.range, [500, 999]);
+});
+
+test('range reads filter every table by the visible dates and fail closed', async () => {
+  const filters: Array<{ table: string; gte?: [string, string]; lte?: [string, string] }> = [];
+  const make = (fail?: string) => ({
+    from(table: string) {
+      const call: (typeof filters)[number] = { table };
+      filters.push(call);
+      const q = {
+        select() { return q; },
+        gte(column: string, value: string) { call.gte = [column, value]; return q; },
+        lte(column: string, value: string) { call.lte = [column, value]; return q; },
+        order() { return q; },
+        limit() { return Promise.resolve({ data: [{ effective_from: '2026-11-17', calorie_target: 1900, protein_target_g: 160 }], error: null }); },
+        range() { return Promise.resolve(fail === table ? { data: null, error: new Error('no') } : { data: [{ entry_date: '2026-11-17' }], error: null }); },
+      };
+      return q;
+    },
+  }) as unknown as SupabaseClient;
+  const data = await readRange(make(), '2026-11-16', '2026-11-22');
+  assert.equal(data.targets.length, 1);
+  assert.equal(data.foods.length, 1);
+  for (const call of filters.filter(c => c.table !== 'daily_targets')) {
+    assert.deepEqual(call.gte, ['entry_date', '2026-11-16']);
+    assert.deepEqual(call.lte, ['entry_date', '2026-11-22']);
+  }
+  assert.deepEqual(filters.find(c => c.table === 'daily_targets')?.lte, ['effective_from', '2026-11-22']);
+  await assert.rejects(readRange(make('exercise_entries'), '2026-11-16', '2026-11-22'), /EXERCISE_READ_FAILED/);
 });
 
 test('database failures are not silently rendered as empty data', async () => {
