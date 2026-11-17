@@ -83,7 +83,7 @@ for (const protocolVersion of ['2025-03-26', '2025-06-18', '2025-11-25']) test(`
   const headers = { 'MCP-Protocol-Version': protocolVersion };
   const list = await rpc(await h.app.fetch(h.request({ jsonrpc: '2.0', id: 2, method: 'tools/list' }, bearer, headers)));
   const tools = (list.result as { tools: Array<{ name: string; annotations: { readOnlyHint: boolean }; _meta: unknown }> }).tools;
-  assert.deepEqual(tools.map(tool => tool.name), ['read_probe', 'write_probe', 'log_weight', 'log_food', 'view_day', 'correct_entry', 'delete_entry']);
+  assert.deepEqual(tools.map(tool => tool.name), ['read_probe', 'write_probe', 'log_weight', 'log_food', 'view_day', 'view_targets', 'set_targets', 'correct_entry', 'delete_entry']);
   assert.equal(tools[0]?.annotations.readOnlyHint, true);
   assert.equal(tools[1]?.annotations.readOnlyHint, false);
   assert.deepEqual(tools[1]?._meta, { securitySchemes: [{ type: 'oauth2', scopes: ['openid'] }] });
@@ -102,7 +102,7 @@ for (const mode of ['legacy', 'auto'] as const) test(`official v2 client ${mode}
   t.after(() => client.close());
   await client.connect(transport);
   assert.equal(client.getProtocolEra(), mode === 'auto' ? 'modern' : 'legacy');
-  assert.equal((await client.listTools()).tools.length, 7);
+  assert.equal((await client.listTools()).tools.length, 9);
   const result = await client.callTool({ name: 'read_probe', arguments: { slot: 'synthetic-1' } });
   assert.equal((result.structuredContent as { found: boolean }).found, false);
   const write = await client.callTool({ name: 'write_probe', arguments: { slot: 'synthetic-1', value: 'alpha', operationKey: randomUUID() } });
