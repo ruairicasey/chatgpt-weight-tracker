@@ -10,9 +10,9 @@ export default async function Login({ searchParams }: { searchParams: Promise<Re
   catch { return <main><h1>Invalid authorization request</h1></main>; }
   return <main className="mx-auto max-w-lg space-y-5 p-8">
     <h1 className="text-2xl font-semibold">Owner login</h1>
-    <p>Sign in to approve your ChatGPT connection. Tracker logging is not enabled yet.</p>
+    <p>Sign in to see your weight and food history, or approve your ChatGPT connection.</p>
     {params.error && <p role="alert">Sign-in failed or access was denied. Try again.</p>}
-    {params.success && <p role="status">Signed in. Start the OAuth connection from ChatGPT.</p>}
+    {params.success && <p role="status">Signed in. <a href="/dashboard">View dashboard</a>.</p>}
     <form action="/login/submit" method="post" className="grid gap-4">
       <input type="hidden" name="authorization_id" value={id} />
       <label>Email <input className="border p-2" name="email" type="email" autoComplete="username" required maxLength={254} /></label>

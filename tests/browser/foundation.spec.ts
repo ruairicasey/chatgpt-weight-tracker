@@ -1,11 +1,11 @@
 import { expect, test } from '@playwright/test';
 
-test('landing page is usable on desktop and mobile without pretending login or logging works', async ({ page }) => {
+test('landing page is usable on desktop and mobile while advertising ChatGPT logging', async ({ page }) => {
   const failures: string[] = [];
   page.on('pageerror', error => failures.push(error.message));
   await page.goto('/');
   await expect(page.getByRole('heading', { level: 1 })).toContainText('Your progress.');
-  await expect(page.getByRole('status')).toContainText('Logging and sign-in are not available yet.');
+  await expect(page.getByRole('status')).toContainText('Logging works through ChatGPT.');
   await expect(page.getByRole('button')).toHaveCount(0);
   await page.setViewportSize({ width: 375, height: 812 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);

@@ -1,3 +1,4 @@
+import Link from 'next/link';
 export default function Home() {
   return (
     <main>
@@ -6,7 +7,8 @@ export default function Home() {
         <p className="eyebrow">A little more intention, every day.</p>
         <h1 id="welcome-title">Your progress.<br /><span>Your own pace.</span></h1>
         <p className="intro">A personal space for food, movement and the habits that add up.</p>
-        <p className="notice" role="status">Your private tracker is taking shape. Logging and sign-in are not available yet.</p>
+        <p className="notice" role="status">Logging works through ChatGPT. Sign in to view your daily food, protein and weight history.</p>
+      <Link href="/login" className="home-signin">Sign in to view dashboard</Link>
       </section>
       <footer>Small steps. A longer view.</footer>
     </main>
