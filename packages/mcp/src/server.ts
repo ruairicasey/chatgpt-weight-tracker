@@ -5,7 +5,7 @@ import { loadMcpExperimentConfig } from '@weight-tracker/config/server';
 import type { TrackerScope } from '@weight-tracker/contracts';
 import type { VerifiedPrincipal } from '@weight-tracker/auth';
 import { createProbeStore, ReadProbeSchema, WriteProbeSchema } from './probes';
-import { trackerApi, LogWeight, LogFood, ViewDay, CorrectEntry, DeleteEntry, ViewTargets, SetTargets } from './tracker';
+import { trackerApi, LogWeight, LogFood, LogExercise, ViewDay, CorrectEntry, DeleteEntry, ViewTargets, SetTargets } from './tracker';
 
 const METHODS = new Set(['initialize', 'notifications/initialized', 'ping', 'server/discover', 'tools/list', 'tools/call']);
 const SCOPES = ['tracker:read', 'entries:write'] as const;
@@ -86,8 +86,12 @@ export function createMcpExperiment(env: Readonly<Record<string, string | undefi
       title: 'Log food', description: 'MUTATION: log a food entry with calories and protein grams for a Melbourne date.',
       inputSchema: LogFood, annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false }, ...secure,
     }, input => authorize('entries:write', async () => result({ entries: await api().logFood(input) })));
+    server.registerTool('log_exercise', {
+      title: 'Log exercise', description: 'MUTATION: log an exercise session (e.g. push, pull, legs, cardio) for a Melbourne date, with optional duration, estimated calories burned and notes. Exercise calories are informational and do not change the daily calorie target.',
+      inputSchema: LogExercise, annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false }, ...secure,
+    }, input => authorize('entries:write', async () => result({ entries: await api().logExercise(input) })));
     server.registerTool('view_day', {
-      title: 'View a day', description: 'Read weight and food entries for a Melbourne calendar date.',
+      title: 'View a day', description: 'Read weight, food and exercise entries plus targets and remaining calories/protein for a Melbourne calendar date. Exercise calories are not added to the remaining allowance.',
       inputSchema: ViewDay, annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }, ...secure,
     }, input => authorize('tracker:read', async () => result(await api().viewDay(input.date))));
     server.registerTool('view_targets', {
@@ -99,11 +103,11 @@ export function createMcpExperiment(env: Readonly<Record<string, string | undefi
       inputSchema: SetTargets, annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false }, ...secure,
     }, input => authorize('targets:write', async () => result({ targets: await api().setTargets(input) })));
     server.registerTool('correct_entry', {
-      title: 'Correct an entry', description: 'MUTATION: correct weight or food using ID and expected revision. Stale changes are rejected.',
+      title: 'Correct an entry', description: 'MUTATION: correct a weight, food or exercise entry using ID and expected revision. Stale changes are rejected.',
       inputSchema: CorrectEntry, annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false }, ...secure,
     }, input => authorize('entries:write', async () => result({ entries: await api().correct(input) })));
     server.registerTool('delete_entry', {
-      title: 'Delete an entry', description: 'DESTRUCTIVE MUTATION: permanently delete a weight or food entry by ID and expected revision.',
+      title: 'Delete an entry', description: 'DESTRUCTIVE MUTATION: permanently delete a weight, food or exercise entry by ID and expected revision.',
       inputSchema: DeleteEntry, annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false }, ...secure,
     }, input => authorize('entries:delete', async () => result(await api().remove(input))));
     return server;

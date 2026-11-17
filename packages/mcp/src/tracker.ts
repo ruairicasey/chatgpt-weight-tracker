@@ -5,6 +5,11 @@ const day = z.iso.date();
 const uuid = z.uuid();
 export const LogWeight = z.strictObject({ date: day, weightKg: z.number().positive().max(999.99), bodyFatPercent: z.number().min(0).max(100).optional() });
 export const LogFood = z.strictObject({ date: day, name: z.string().trim().min(1).max(200), calories: z.number().int().min(0).max(100000), proteinG: z.number().min(0).max(10000) });
+const activity = z.string().trim().min(1).max(100);
+const duration = z.number().int().min(1).max(1440);
+const burned = z.number().int().min(0).max(10000);
+const notes = z.string().trim().max(500);
+export const LogExercise = z.strictObject({ date: day, activity, durationMinutes: duration.optional(), caloriesBurned: burned.optional(), notes: notes.optional() });
 export const ViewDay = z.strictObject({ date: day });
 export const ViewTargets = z.strictObject({ date: day });
 export const SetTargets = z.strictObject({
@@ -24,12 +29,20 @@ export function remainingForDay(foods: Array<Record<string,unknown>>, target: Ta
       proteinG: Number((Number(target.protein_target_g) - consumed.proteinG).toFixed(2)),
     } : null };
 }
-export const CorrectEntry = z.strictObject({ kind: z.enum(['weight', 'food']), id: uuid, expectedRevision: z.number().int().positive(), weightKg: z.number().positive().max(999.99).optional(), bodyFatPercent: z.number().min(0).max(100).nullable().optional(), name: z.string().trim().min(1).max(200).optional(), calories: z.number().int().min(0).max(100000).optional(), proteinG: z.number().min(0).max(10000).optional() }).superRefine((v,ctx) => {
-  const weight = v.weightKg !== undefined || v.bodyFatPercent !== undefined;
-  const food = v.name !== undefined || v.calories !== undefined || v.proteinG !== undefined;
-  if ((v.kind === 'weight' && (!weight || food)) || (v.kind === 'food' && (!food || weight))) ctx.addIssue({ code:'custom', message:'Fields must match kind and include a correction' });
+const kinds = z.enum(['weight', 'food', 'exercise']);
+export const CorrectEntry = z.strictObject({ kind: kinds, id: uuid, expectedRevision: z.number().int().positive(), weightKg: z.number().positive().max(999.99).optional(), bodyFatPercent: z.number().min(0).max(100).nullable().optional(), name: z.string().trim().min(1).max(200).optional(), calories: z.number().int().min(0).max(100000).optional(), proteinG: z.number().min(0).max(10000).optional(),
+  activity: activity.optional(), durationMinutes: duration.nullable().optional(), caloriesBurned: burned.nullable().optional(), notes: notes.nullable().optional() }).superRefine((v,ctx) => {
+  const given = {
+    weight: v.weightKg !== undefined || v.bodyFatPercent !== undefined,
+    food: v.name !== undefined || v.calories !== undefined || v.proteinG !== undefined,
+    exercise: v.activity !== undefined || v.durationMinutes !== undefined || v.caloriesBurned !== undefined || v.notes !== undefined,
+  };
+  const others = (Object.keys(given) as Array<keyof typeof given>).filter(kind => kind !== v.kind);
+  if (!given[v.kind] || others.some(kind => given[kind])) ctx.addIssue({ code:'custom', message:'Fields must match kind and include a correction' });
 });
-export const DeleteEntry = z.strictObject({ kind: z.enum(['weight','food']), id: uuid, expectedRevision: z.number().int().positive() });
+export const DeleteEntry = z.strictObject({ kind: kinds, id: uuid, expectedRevision: z.number().int().positive() });
+type Kind = z.infer<typeof kinds>;
+const TABLES = { weight: 'weight_entries', food: 'food_entries', exercise: 'exercise_entries' } as const;
 
 /** REST calls carry the verified caller's JWT. RLS is the authorization boundary. */
 export function trackerApi(env: Readonly<Record<string,string|undefined>>, token: string, owner: string, fetcher: typeof fetch = fetch) {
@@ -37,7 +50,7 @@ export function trackerApi(env: Readonly<Record<string,string|undefined>>, token
   const key = env.SUPABASE_PUBLISHABLE_KEY;
   if (!base || !/^https:\/\/[a-z0-9]{20}\.supabase\.co$/.test(base) ||
       !key || !/^sb_publishable_[A-Za-z0-9_-]{16,256}$/.test(key)) throw new Error('DATA_API_NOT_CONFIGURED');
-  async function request(table: 'weight_entries'|'food_entries'|'daily_targets', method: string, query: string, payload?: object, preference = 'return=representation') {
+  async function request(table: 'weight_entries'|'food_entries'|'exercise_entries'|'daily_targets', method: string, query: string, payload?: object, preference = 'return=representation') {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 8000);
     try {
@@ -59,7 +72,17 @@ export function trackerApi(env: Readonly<Record<string,string|undefined>>, token
       `${ownerFilter}&effective_from=lte.${date}&select=owner_id,effective_from,calorie_target,protein_target_g&order=effective_from.desc&limit=1`);
     return (rows[0] ?? null) as TargetRow | null;
   }
-  const table = (kind: 'weight'|'food') => kind === 'weight' ? 'weight_entries' : 'food_entries';
+  const table = (kind: Kind) => TABLES[kind];
+  async function allForDay(name: 'food_entries'|'exercise_entries', date: string) {
+    const rows: Record<string,unknown>[] = [];
+    for (let offset = 0;; offset += 500) {
+      const batch = await request(name, 'GET',
+        `${ownerFilter}&entry_date=eq.${date}&select=*&order=created_at.asc,id.asc&offset=${offset}&limit=500`);
+      rows.push(...batch);
+      if (batch.length < 500) break;
+    }
+    return rows;
+  }
   return {
     async logWeight(input: z.infer<typeof LogWeight>) {
       return request('weight_entries','POST','select=id,entry_date,weight_kg,body_fat_percent,revision', {
@@ -71,19 +94,21 @@ export function trackerApi(env: Readonly<Record<string,string|undefined>>, token
         owner_id: owner, entry_date: input.date, name: input.name, calories: input.calories, protein_g: input.proteinG,
       });
     },
+    async logExercise(input: z.infer<typeof LogExercise>) {
+      return request('exercise_entries','POST','select=id,entry_date,activity,duration_minutes,calories_burned,notes,revision', {
+        owner_id: owner, entry_date: input.date, activity: input.activity,
+        duration_minutes: input.durationMinutes ?? null, calories_burned: input.caloriesBurned ?? null, notes: input.notes ?? null,
+      });
+    },
     async viewDay(date: string) {
       const [weights, target] = await Promise.all([
         request('weight_entries','GET',`${ownerFilter}&entry_date=eq.${date}&select=*&limit=1`),
         targetFor(date),
       ]);
-      const foods: Record<string,unknown>[] = [];
-      for (let offset = 0;; offset += 500) {
-        const batch = await request('food_entries', 'GET',
-          `${ownerFilter}&entry_date=eq.${date}&select=*&order=created_at.asc,id.asc&offset=${offset}&limit=500`);
-        foods.push(...batch);
-        if (batch.length < 500) break;
-      }
-      return { date, weights, foods, targets: target, ...remainingForDay(foods, target) };
+      const foods = await allForDay('food_entries', date);
+      const exercises = await allForDay('exercise_entries', date);
+      // Exercise calories are informational and deliberately excluded from "remaining".
+      return { date, weights, foods, exercises, targets: target, ...remainingForDay(foods, target) };
     },
     async viewTargets(date: string) {
       return { date, targets: await targetFor(date) };
@@ -108,10 +133,15 @@ export function trackerApi(env: Readonly<Record<string,string|undefined>>, token
       if (input.kind === 'weight') {
         if (input.weightKg !== undefined) patch.weight_kg = input.weightKg;
         if (input.bodyFatPercent !== undefined) patch.body_fat_percent = input.bodyFatPercent;
-      } else {
+      } else if (input.kind === 'food') {
         if (input.name !== undefined) patch.name = input.name;
         if (input.calories !== undefined) patch.calories = input.calories;
         if (input.proteinG !== undefined) patch.protein_g = input.proteinG;
+      } else {
+        if (input.activity !== undefined) patch.activity = input.activity;
+        if (input.durationMinutes !== undefined) patch.duration_minutes = input.durationMinutes;
+        if (input.caloriesBurned !== undefined) patch.calories_burned = input.caloriesBurned;
+        if (input.notes !== undefined) patch.notes = input.notes;
       }
       const rows = await request(table(input.kind),'PATCH',`${ownerFilter}&id=eq.${input.id}&revision=eq.${input.expectedRevision}&select=*`,patch);
       if (!rows.length) throw new Error('ENTRY_NOT_FOUND_OR_STALE');

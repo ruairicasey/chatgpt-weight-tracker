@@ -11,8 +11,9 @@ The two planned services are **Vercel Hobby** and **Supabase Free**, alongside t
 owner's existing ChatGPT Plus subscription. No separate OAuth provider is selected.
 
 Supabase JWT verification, owner authorization and login/consent pages support the
-existing production configuration. Five owner-only MCP tools now provide weight
-and food logging, daily views, corrections and deletions through a server-only
+existing production configuration. Owner-only MCP tools provide weight, food and
+exercise logging, dated calorie/protein targets, daily views, corrections and
+deletions through a server-only
 Data API client and PostgreSQL RLS. Production MCP is **off by default** until
 `MCP_PRODUCTION_ENABLED=true` is set on Vercel Production and redeployed.
 The tracker migration must be applied manually in Supabase before activation.

@@ -31,6 +31,10 @@ function fakeClient(options: { failTable?: string; historyCount?: number } = {})
     { id: 'food-a', entry_date: '2026-11-17', name: 'Eggs', calories: 300, protein_g: 24 },
     { id: 'food-b', entry_date: '2026-11-17', name: 'Toast', calories: 200, protein_g: 6 },
   ];
+  const exercises = [
+    { id: 'ex-a', entry_date: '2026-11-17', activity: 'Push', duration_minutes: 60, calories_burned: 300, notes: null },
+    { id: 'ex-b', entry_date: '2026-11-17', activity: 'Walk', duration_minutes: null, calories_burned: null, notes: 'Easy' },
+  ];
   const client = {
     from(table: string) {
       const call: (typeof calls)[number] = { table };
@@ -43,7 +47,7 @@ function fakeClient(options: { failTable?: string; historyCount?: number } = {})
         limit(n: number) { call.limit = n; return Promise.resolve({
           data: options.failTable === table ? null : table === 'daily_targets' ? [{ effective_from: '2026-11-17', calorie_target: 1900, protein_target_g: 160 }] : [allHistory[0]], error: options.failTable === table ? new Error('no') : null,
         }); },
-        range(from: number, to: number) { call.range = [from, to]; const rows = table === 'food_entries' ? foods : allHistory;
+        range(from: number, to: number) { call.range = [from, to]; const rows = table === 'food_entries' ? foods : table === 'exercise_entries' ? exercises : allHistory;
           return Promise.resolve({ data: options.failTable === table ? null : rows.slice(from, to + 1), error: options.failTable === table ? new Error('no') : null }); },
       };
       return q;
@@ -60,10 +64,13 @@ test('dashboard reads one owner-session day, food totals and all paginated weigh
   assert.equal(result.targets?.calorie_target, 1900);
   assert.deepEqual(result.totals, { calories: 500, proteinG: 30 });
   assert.equal(result.weights.length, 502);
-  assert.deepEqual(calls.map(call => call.table), ['weight_entries', 'daily_targets', 'food_entries', 'weight_entries', 'weight_entries']);
+  assert.equal(result.exercises.length, 2);
+  assert.deepEqual(result.exerciseTotals, { minutes: 60, caloriesBurned: 300 });
+  assert.deepEqual(calls.map(call => call.table), ['weight_entries', 'daily_targets', 'food_entries', 'exercise_entries', 'weight_entries', 'weight_entries']);
   assert.deepEqual(calls[2]?.eq, ['entry_date', '2026-11-17']);
-  assert.deepEqual(calls[3]?.range, [0, 499]);
-  assert.deepEqual(calls[4]?.range, [500, 999]);
+  assert.deepEqual(calls[3]?.eq, ['entry_date', '2026-11-17']);
+  assert.deepEqual(calls[4]?.range, [0, 499]);
+  assert.deepEqual(calls[5]?.range, [500, 999]);
 });
 
 test('database failures are not silently rendered as empty data', async () => {
