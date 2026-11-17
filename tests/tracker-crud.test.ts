@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { randomUUID } from 'node:crypto';
-import { trackerApi, LogWeight, LogFood, ViewDay, CorrectEntry, DeleteEntry } from '../packages/mcp/src/tracker';
+import { trackerApi, LogWeight, LogFood, ViewDay, ViewTargets, SetTargets, CorrectEntry, DeleteEntry } from '../packages/mcp/src/tracker';
 
 const owner = '00000000-0000-4000-8000-000000000001';
 const env = {
@@ -14,6 +14,10 @@ test('strict tracker inputs validate dates, numbers, revisions and forbid owner 
   assert.equal(LogWeight.parse({ date: '2026-11-17', weightKg: 75.2 }).weightKg, 75.2);
   assert.equal(LogFood.parse({ date: '2026-11-17', name: 'Oats', calories: 300, proteinG: 12 }).proteinG, 12);
   assert.equal(ViewDay.parse({ date: '2026-11-17' }).date, '2026-11-17');
+  assert.equal(ViewTargets.parse({ date: '2026-11-17' }).date, '2026-11-17');
+  assert.equal(SetTargets.parse({ effectiveFrom: '2026-11-24', calories: 2000 }).calories, 2000);
+  assert.equal(SetTargets.safeParse({ effectiveFrom: '2026-11-24' }).success, false);
+  assert.equal(SetTargets.safeParse({ effectiveFrom: '2026-11-24', owner_id: owner, calories: 2000 }).success, false);
   for (const input of [
     { date: '2026-02-30', weightKg: 75 },
     { date: '2026-11-17', weightKg: -1 },
@@ -49,13 +53,13 @@ test('CRUD uses the verified owner and caller bearer, never service-role credent
   await api.logWeight({ date: '2026-11-17', weightKg: 75.2 });
   await api.logFood({ date: '2026-11-17', name: 'Oats', calories: 300, proteinG: 12 });
   const daily = await api.viewDay('2026-11-17');
-  assert.deepEqual(daily, { date: '2026-11-17', weights: [], foods: [] });
+  assert.deepEqual(daily, { date: '2026-11-17', weights: [], foods: [], targets: null, consumed: { calories: 0, proteinG: 0 }, remaining: null });
   await api.correct({ kind: 'food', id: randomUUID(), expectedRevision: 1, calories: 310 });
   await api.remove({ kind: 'weight', id: randomUUID(), expectedRevision: 2 });
-  assert.deepEqual(calls.map(call => call.method), ['POST', 'POST', 'GET', 'GET', 'PATCH', 'DELETE']);
-  assert.equal(calls[4]?.url.searchParams.get('revision'), 'eq.1');
-  assert.equal(calls[4]?.body?.revision, 2);
-  assert.equal(calls[5]?.url.searchParams.get('revision'), 'eq.2');
+  assert.deepEqual(calls.map(call => call.method), ['POST', 'POST', 'GET', 'GET', 'GET', 'PATCH', 'DELETE']);
+  assert.equal(calls[5]?.url.searchParams.get('revision'), 'eq.1');
+  assert.equal(calls[5]?.body?.revision, 2);
+  assert.equal(calls[6]?.url.searchParams.get('revision'), 'eq.2');
 });
 
 test('API denies missing configuration and unauthorized PostgREST responses', async () => {
