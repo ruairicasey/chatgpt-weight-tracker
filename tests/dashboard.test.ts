@@ -37,10 +37,11 @@ function fakeClient(options: { failTable?: string; historyCount?: number } = {})
       calls.push(call);
       const q = {
         select() { return q; },
+        lte(column: string, value: string) { call.eq = [column, value]; return q; },
         eq(column: string, value: string) { call.eq = [column, value]; return q; },
         order() { return q; },
         limit(n: number) { call.limit = n; return Promise.resolve({
-          data: options.failTable === table ? null : [allHistory[0]], error: options.failTable === table ? new Error('no') : null,
+          data: options.failTable === table ? null : table === 'daily_targets' ? [{ effective_from: '2026-11-17', calorie_target: 1900, protein_target_g: 160 }] : [allHistory[0]], error: options.failTable === table ? new Error('no') : null,
         }); },
         range(from: number, to: number) { call.range = [from, to]; const rows = table === 'food_entries' ? foods : allHistory;
           return Promise.resolve({ data: options.failTable === table ? null : rows.slice(from, to + 1), error: options.failTable === table ? new Error('no') : null }); },
@@ -56,12 +57,13 @@ test('dashboard reads one owner-session day, food totals and all paginated weigh
   const result = await readDashboard(client, '2026-11-17');
   assert.equal(result.dayWeight?.weight_kg, 80);
   assert.equal(result.foods.length, 2);
+  assert.equal(result.targets?.calorie_target, 1900);
   assert.deepEqual(result.totals, { calories: 500, proteinG: 30 });
   assert.equal(result.weights.length, 502);
-  assert.deepEqual(calls.map(call => call.table), ['weight_entries', 'food_entries', 'weight_entries', 'weight_entries']);
-  assert.deepEqual(calls[1]?.eq, ['entry_date', '2026-11-17']);
-  assert.deepEqual(calls[2]?.range, [0, 499]);
-  assert.deepEqual(calls[3]?.range, [500, 999]);
+  assert.deepEqual(calls.map(call => call.table), ['weight_entries', 'daily_targets', 'food_entries', 'weight_entries', 'weight_entries']);
+  assert.deepEqual(calls[2]?.eq, ['entry_date', '2026-11-17']);
+  assert.deepEqual(calls[3]?.range, [0, 499]);
+  assert.deepEqual(calls[4]?.range, [500, 999]);
 });
 
 test('database failures are not silently rendered as empty data', async () => {

@@ -41,3 +41,13 @@ footer { border-top: 1px solid #d7dbcd; padding-top: 22px; color: var(--muted); 
 .dashboard a { color: #36583f; }
 .empty { color: var(--muted); }
 @media (max-width: 720px) { .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } .dashboard-panel { padding: 18px; } }
+
+.target-over { color: #9e382e; font-weight: 600; }
+.target-under { color: #336442; font-weight: 600; }
+.trend-chart { width: 100%; margin-bottom: 22px; }
+.trend-chart svg { display: block; width: 100%; max-height: 280px; overflow: visible; }
+.chart-legend { color: var(--muted); display: flex; gap: 24px; flex-wrap: wrap; font-size: 13px; }
+.legend-actual { color: #26382e; }
+.legend-average { color: #718969; }
+.trend-summary { color: var(--muted); font-size: 14px; margin-bottom: 8px; }
+.trend-summary strong { color: var(--ink); }

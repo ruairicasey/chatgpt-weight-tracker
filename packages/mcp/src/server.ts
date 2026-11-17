@@ -5,7 +5,7 @@ import { loadMcpExperimentConfig } from '@weight-tracker/config/server';
 import type { TrackerScope } from '@weight-tracker/contracts';
 import type { VerifiedPrincipal } from '@weight-tracker/auth';
 import { createProbeStore, ReadProbeSchema, WriteProbeSchema } from './probes';
-import { trackerApi, LogWeight, LogFood, ViewDay, CorrectEntry, DeleteEntry } from './tracker';
+import { trackerApi, LogWeight, LogFood, ViewDay, CorrectEntry, DeleteEntry, ViewTargets, SetTargets } from './tracker';
 
 const METHODS = new Set(['initialize', 'notifications/initialized', 'ping', 'server/discover', 'tools/list', 'tools/call']);
 const SCOPES = ['tracker:read', 'entries:write'] as const;
@@ -90,6 +90,14 @@ export function createMcpExperiment(env: Readonly<Record<string, string | undefi
       title: 'View a day', description: 'Read weight and food entries for a Melbourne calendar date.',
       inputSchema: ViewDay, annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }, ...secure,
     }, input => authorize('tracker:read', async () => result(await api().viewDay(input.date))));
+    server.registerTool('view_targets', {
+      title: 'View daily targets', description: 'Read calorie and protein targets effective on a Melbourne date; earlier targets remain historical.',
+      inputSchema: ViewTargets, annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }, ...secure,
+    }, input => authorize('tracker:read', async () => result(await api().viewTargets(input.date))));
+    server.registerTool('set_targets', {
+      title: 'Set daily targets', description: 'MUTATION: set calories and/or protein targets from an explicit Melbourne date (YYYY-MM-DD). Omitted target retains the prior value. Historic dates remain unchanged.',
+      inputSchema: SetTargets, annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false }, ...secure,
+    }, input => authorize('targets:write', async () => result({ targets: await api().setTargets(input) })));
     server.registerTool('correct_entry', {
       title: 'Correct an entry', description: 'MUTATION: correct weight or food using ID and expected revision. Stale changes are rejected.',
       inputSchema: CorrectEntry, annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false }, ...secure,
