@@ -49,6 +49,7 @@ test('owner bearer reads effective targets, preserves protein during partial set
   const api=trackerApi(env,bearer,owner,fetcher);
   assert.deepEqual(await api.viewTargets('2026-11-20'), {date:'2026-11-20',targets:existing});
   const updated=await api.setTargets({effectiveFrom:'2026-11-24',calories:2000});
+  assert.ok(updated);
   assert.equal(updated.calorie_target,2000);
   assert.equal(updated.protein_target_g,160);
   const day=await api.viewDay('2026-11-20');
