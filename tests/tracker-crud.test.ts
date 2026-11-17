@@ -53,13 +53,13 @@ test('CRUD uses the verified owner and caller bearer, never service-role credent
   await api.logWeight({ date: '2026-11-17', weightKg: 75.2 });
   await api.logFood({ date: '2026-11-17', name: 'Oats', calories: 300, proteinG: 12 });
   const daily = await api.viewDay('2026-11-17');
-  assert.deepEqual(daily, { date: '2026-11-17', weights: [], foods: [], targets: null, consumed: { calories: 0, proteinG: 0 }, remaining: null });
+  assert.deepEqual(daily, { date: '2026-11-17', weights: [], foods: [], exercises: [], targets: null, consumed: { calories: 0, proteinG: 0 }, remaining: null });
   await api.correct({ kind: 'food', id: randomUUID(), expectedRevision: 1, calories: 310 });
   await api.remove({ kind: 'weight', id: randomUUID(), expectedRevision: 2 });
-  assert.deepEqual(calls.map(call => call.method), ['POST', 'POST', 'GET', 'GET', 'GET', 'PATCH', 'DELETE']);
-  assert.equal(calls[5]?.url.searchParams.get('revision'), 'eq.1');
-  assert.equal(calls[5]?.body?.revision, 2);
-  assert.equal(calls[6]?.url.searchParams.get('revision'), 'eq.2');
+  assert.deepEqual(calls.map(call => call.method), ['POST', 'POST', 'GET', 'GET', 'GET', 'GET', 'PATCH', 'DELETE']);
+  assert.equal(calls[6]?.url.searchParams.get('revision'), 'eq.1');
+  assert.equal(calls[6]?.body?.revision, 2);
+  assert.equal(calls[7]?.url.searchParams.get('revision'), 'eq.2');
 });
 
 test('API denies missing configuration and unauthorized PostgREST responses', async () => {

@@ -22,6 +22,14 @@ export function selectedDate(value: unknown, now: Date = new Date()): string {
 export type WeightRow = { id: string; entry_date: string; weight_kg: number; body_fat_percent: number | null };
 export type DailyTarget = { effective_from: string; calorie_target: number; protein_target_g: number };
 export type FoodRow = { id: string; entry_date: string; name: string; calories: number; protein_g: number };
+export type ExerciseRow = { id: string; entry_date: string; activity: string; duration_minutes: number | null; calories_burned: number | null; notes: string | null };
+
+export function exerciseTotals(rows: ReadonlyArray<Pick<ExerciseRow, 'duration_minutes' | 'calories_burned'>>) {
+  return rows.reduce((totals, row) => ({
+    minutes: totals.minutes + Number(row.duration_minutes ?? 0),
+    caloriesBurned: totals.caloriesBurned + Number(row.calories_burned ?? 0),
+  }), { minutes: 0, caloriesBurned: 0 });
+}
 
 export function foodTotals(foods: ReadonlyArray<Pick<FoodRow, 'calories' | 'protein_g'>>) {
   return foods.reduce((totals, food) => ({
@@ -57,6 +65,17 @@ export async function readDashboard(client: SupabaseClient, date: string) {
     foods.push(...rows);
     if (rows.length < pageSize) break;
   }
+  const exercises: ExerciseRow[] = [];
+  for (let offset = 0;; offset += pageSize) {
+    const page = await client.from('exercise_entries')
+      .select('id,entry_date,activity,duration_minutes,calories_burned,notes')
+      .eq('entry_date', date).order('created_at', { ascending: true })
+      .order('id', { ascending: true }).range(offset, offset + pageSize - 1);
+    if (page.error) throw new Error('EXERCISE_READ_FAILED');
+    const rows = (page.data ?? []) as ExerciseRow[];
+    exercises.push(...rows);
+    if (rows.length < pageSize) break;
+  }
   for (let offset = 0;; offset += pageSize) {
     const page = await client.from('weight_entries')
       .select('id,entry_date,weight_kg,body_fat_percent')
@@ -72,6 +91,8 @@ export async function readDashboard(client: SupabaseClient, date: string) {
     foods,
     weights,
     totals: foodTotals(foods),
+    exercises,
+    exerciseTotals: exerciseTotals(exercises),
     targets,
   };
 }

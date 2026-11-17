@@ -30,7 +30,7 @@ export default async function Dashboard({ searchParams }: {
   try { data = await readDashboard(supabase, date); }
   catch { return <main className="dashboard"><h1>Dashboard unavailable</h1><p>Entries could not be loaded. Please try again.</p><Link href="/dashboard">Retry</Link></main>; }
 
-  const { dayWeight, foods, weights, totals, targets } = data;
+  const { dayWeight, foods, weights, totals, targets, exercises, exerciseTotals } = data;
   const remainingCalories = targets ? Number(targets.calorie_target) - totals.calories : null;
   const remainingProtein = targets ? Number(targets.protein_target_g) - totals.proteinG : null;
   const trend = weightTrend(weights, melbourneToday());
@@ -40,7 +40,7 @@ export default async function Dashboard({ searchParams }: {
     <header className="dashboard-header">
       <p className="eyebrow">Your daily progress</p>
       <h1>Today &amp; beyond.</h1>
-      <p>Read-only overview. Log, correct and delete entries through ChatGPT.</p>
+      <p>Read-only overview. Log, correct and delete food, weight and exercise through ChatGPT.</p>
     </header>
 
     <section className="dashboard-panel" aria-labelledby="daily-title">
@@ -67,6 +67,19 @@ export default async function Dashboard({ searchParams }: {
         <tbody>{foods.map(food => <tr key={food.id}><td>{food.name}</td><td className="numeric">{Number(food.calories).toLocaleString('en-AU')} kcal</td><td className="numeric">{Number(food.protein_g).toFixed(1)} g</td></tr>)}</tbody>
         <tfoot><tr><th scope="row">Total</th><td className="numeric">{totals.calories.toLocaleString('en-AU')} kcal</td><td className="numeric">{totals.proteinG.toFixed(1)} g</td></tr></tfoot>
       </table></div>}
+      <h3>Exercise</h3>
+      {exercises.length === 0 ? <p className="empty">No exercise logged for this day.</p> : <>
+      <div className="table-scroll"><table>
+        <thead><tr><th scope="col">Activity</th><th scope="col" className="numeric">Duration</th><th scope="col" className="numeric">Est. burned</th><th scope="col">Notes</th></tr></thead>
+        <tbody>{exercises.map(item => <tr key={item.id}>
+          <td>{item.activity}</td>
+          <td className="numeric">{item.duration_minutes != null ? `${item.duration_minutes} min` : '—'}</td>
+          <td className="numeric">{item.calories_burned != null ? `${Number(item.calories_burned).toLocaleString('en-AU')} kcal` : '—'}</td>
+          <td>{item.notes ?? ''}</td>
+        </tr>)}</tbody>
+        <tfoot><tr><th scope="row">Total</th><td className="numeric">{exerciseTotals.minutes} min</td><td className="numeric">{exerciseTotals.caloriesBurned.toLocaleString('en-AU')} kcal</td><td /></tr></tfoot>
+      </table></div>
+      <p className="empty">Exercise calories are shown for reference and are not added to your calorie target.</p></>}
     </section>
 
     <section className="dashboard-panel" aria-labelledby="history-title">

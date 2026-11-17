@@ -35,5 +35,6 @@ This change adds only targets/trend, preserving the existing owner-only tracker 
 - Weekly change uses the earliest and latest weigh-ins within the past 14 Melbourne
   calendar days (including today), divided by elapsed days and multiplied by 7;
   percent uses the earliest weight. Fewer than two distinct dates show no estimate.
-- No exercise adjustment to food targets. No exercise data, Claude integration,
+- No exercise adjustment to food targets. (Exercise logging was added later in
+  `docs/exercise-phase.md`; it remains informational.) No Claude integration,
   idempotency machinery or multi-user implementation in this phase.
