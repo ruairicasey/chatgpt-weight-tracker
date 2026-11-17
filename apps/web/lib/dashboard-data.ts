@@ -20,6 +20,7 @@ export function selectedDate(value: unknown, now: Date = new Date()): string {
 }
 
 export type WeightRow = { id: string; entry_date: string; weight_kg: number; body_fat_percent: number | null };
+export type DailyTarget = { effective_from: string; calorie_target: number; protein_target_g: number };
 export type FoodRow = { id: string; entry_date: string; name: string; calories: number; protein_g: number };
 
 export function foodTotals(foods: ReadonlyArray<Pick<FoodRow, 'calories' | 'protein_g'>>) {
@@ -36,6 +37,12 @@ export async function readDashboard(client: SupabaseClient, date: string) {
     .select('id,entry_date,weight_kg,body_fat_percent')
     .eq('entry_date', date).limit(1);
   if (dayWeight.error) throw new Error('WEIGHT_READ_FAILED');
+
+  const targetResponse = await client.from('daily_targets')
+    .select('effective_from,calorie_target,protein_target_g')
+    .lte('effective_from', date).order('effective_from', { ascending: false }).limit(1);
+  if (targetResponse.error) throw new Error('TARGETS_READ_FAILED');
+  const targets = ((targetResponse.data ?? [])[0] ?? null) as DailyTarget | null;
 
   const foods: FoodRow[] = [];
   const weights: WeightRow[] = [];
@@ -65,5 +72,6 @@ export async function readDashboard(client: SupabaseClient, date: string) {
     foods,
     weights,
     totals: foodTotals(foods),
+    targets,
   };
 }
