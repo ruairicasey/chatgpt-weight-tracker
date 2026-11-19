@@ -20,6 +20,7 @@ export function createOwnerAuthentication(input: OAuthConfig, fetcher: typeof fe
   const identities = new WeakSet<VerifiedExternalIdentity>();
   const expirations = new WeakMap<VerifiedExternalIdentity, number>();
   const denied = () => new AuthenticationError('access_denied');
+  const approvedClientIds: readonly string[] = Object.freeze([config.clientId, ...config.additionalClientIds]);
   function assertIdentity(identity: VerifiedExternalIdentity) {
     if (!identities.has(identity) || Date.now() >= (expirations.get(identity) ?? 0)) throw denied();
   }
@@ -44,13 +45,13 @@ export function createOwnerAuthentication(input: OAuthConfig, fetcher: typeof fe
             !UserIdSchema.safeParse(payload.session_id).success || !UserIdSchema.safeParse(payload.sub).success ||
             (payload.scope !== undefined && (typeof payload.scope !== 'string' || payload.scope.length > 2048 ||
               (payload.scope !== '' && !/^[\x21\x23-\x5b\x5d-\x7e]+(?: [\x21\x23-\x5b\x5d-\x7e]+)*$/.test(payload.scope))))) throw new AuthenticationError('invalid_token');
-        if (payload.client_id !== config.clientId || payload.sub !== config.ownerUserId) throw denied();
+        if (typeof payload.client_id !== 'string' || !approvedClientIds.includes(payload.client_id) || payload.sub !== config.ownerUserId) throw denied();
         // Supabase scope is optional (omitempty) and describes OIDC identity access.
         // Missing/empty/other OIDC scopes never change the fixed owner CRUD policy.
         // Internal domain permissions: fixed owner policy, NOT Supabase OAuth scopes.
         // Never derive grants from user_metadata, permissions or caller arguments.
         const scopes = TrackerScopeSchema.options;
-        const identity = Object.freeze({ issuer: config.issuer, subject: payload.sub, clientId: config.clientId, scopes: Object.freeze([...new Set(scopes)]) }) as VerifiedExternalIdentity;
+        const identity = Object.freeze({ issuer: config.issuer, subject: payload.sub, clientId: payload.client_id, scopes: Object.freeze([...new Set(scopes)]) }) as VerifiedExternalIdentity;
         identities.add(identity);
         expirations.set(identity, payload.exp! * 1000);
         return identity;
@@ -63,7 +64,7 @@ export function createOwnerAuthentication(input: OAuthConfig, fetcher: typeof fe
   const resolver: PrincipalResolver = {
     async resolve(identity) {
       assertIdentity(identity);
-      if (identity.issuer !== config.issuer || identity.clientId !== config.clientId || identity.subject !== config.ownerUserId) throw denied();
+      if (identity.issuer !== config.issuer || !approvedClientIds.includes(identity.clientId) || identity.subject !== config.ownerUserId) throw denied();
       return Object.freeze({ userId: UserIdSchema.parse(config.ownerUserId), identity }) as VerifiedPrincipal;
     },
   };

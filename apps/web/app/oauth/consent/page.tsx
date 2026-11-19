@@ -18,19 +18,19 @@ export default async function Consent({ searchParams }: { searchParams: Promise<
   try { requireWebOwner(user, config); }
   catch { return <main><h1>Access denied</h1></main>; }
   const { data, error } = await client.auth.oauth.getAuthorizationDetails(id);
-  if (error || !data) return <main><h1>Authorization request unavailable</h1><p>Restart the connection from ChatGPT.</p></main>;
+  if (error || !data) return <main><h1>Authorization request unavailable</h1><p>Restart the connection from ChatGPT or Claude.</p></main>;
   let previousRedirect: string | undefined;
+  let appName = 'your AI assistant';
   try {
     if ('redirect_url' in data) previousRedirect = consentRedirect(data.redirect_url, config);
-    else requireConsentDetails(data, config, id);
+    else appName = requireConsentDetails(data, config, id).name;
   } catch { return <main><h1>Access denied</h1></main>; }
   // Supabase returns a redirect when prior consent already covers this request.
   // The callback is pinned here; /mcp independently checks the approved client.
   if (previousRedirect) redirect(previousRedirect);
   return <main className="mx-auto max-w-lg space-y-5 p-8">
-    <h1 className="text-2xl font-semibold">Connect ChatGPT to your tracker</h1>
-    <p>This connection authorizes ChatGPT to read, create, correct and delete your tracker records as the owner.</p>
-    <p>The current experiment exposes synthetic read/write probes only. It stores no tracker records.</p>
+    <h1 className="text-2xl font-semibold">Connect {appName} to your tracker</h1>
+    <p>This connection authorizes {appName} to read, create, correct and delete your weight, food, exercise and target records as the owner.</p>
     <p>Requested identity scopes: {'scope' in data ? data.scope : ''}.</p>
     <p>Supabase’s identity scopes do not limit these application permissions. You can revoke the connection in Supabase.</p>
     <form action="/oauth/consent/submit" method="post" className="flex gap-4">

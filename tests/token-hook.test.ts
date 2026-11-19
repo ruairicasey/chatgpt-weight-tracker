@@ -49,3 +49,33 @@ test('actual PostgreSQL hook preserves dashboard claims, binds approved client a
     await assert.rejects(db.query('select * from private.mcp_oauth_settings'));
   } finally { await db.close(); }
 });
+
+test('additional approved client (Claude) gets the MCP audience with the same owner checks', async () => {
+  const db = new PGlite();
+  const claude = '00000000-0000-4000-8000-000000000006';
+  try {
+    await db.exec('create role anon; create role authenticated; create role supabase_auth_admin;');
+    await db.exec(readFileSync('supabase/migrations/202611100001_mcp_access_token_hook.sql', 'utf8'));
+    await db.exec(readFileSync('supabase/migrations/202611190001_mcp_additional_clients.sql', 'utf8'));
+    async function invoke(value: object) {
+      const response = await db.query<{ event: { claims: Record<string, unknown> } }>('select public.mcp_access_token_hook($1::jsonb) as event', [JSON.stringify(value)]);
+      return response.rows[0]!.event;
+    }
+    await db.query('insert into private.mcp_oauth_settings(client_id, owner_id, resource) values ($1,$2,$3)', [client, owner, resource]);
+    const claudeClaims = { ...claims, client_id: claude };
+    // Not yet approved: keeps its normal audience.
+    assert.equal((await invoke({ claims: claudeClaims })).claims.aud, 'authenticated');
+    await db.query("insert into private.mcp_oauth_additional_clients(client_id, label) values ($1, 'Claude')", [claude]);
+    assert.equal((await invoke({ claims: claudeClaims })).claims.aud, resource);
+    assert.equal((await invoke({ claims })).claims.aud, resource); // ChatGPT unchanged
+    for (const override of [{ sub: '00000000-0000-4000-8000-000000000003' }, { role: 'service_role' }, { is_anonymous: true }]) await assert.rejects(invoke({ claims: { ...claudeClaims, ...override } }));
+    const unknown = { claims: { ...claims, client_id: '00000000-0000-4000-8000-000000000003' } };
+    assert.deepEqual(await invoke(unknown), unknown);
+    await assert.rejects(db.query("insert into private.mcp_oauth_additional_clients(client_id, label) values ($1, 'Other')", ['00000000-0000-4000-8000-000000000007']));
+    await db.exec('set role supabase_auth_admin;');
+    assert.equal((await invoke({ claims: claudeClaims })).claims.aud, resource);
+    await assert.rejects(db.query('select * from private.mcp_oauth_additional_clients'));
+    await db.exec('reset role; set role authenticated;');
+    await assert.rejects(db.query('select * from private.mcp_oauth_additional_clients'));
+  } finally { await db.close(); }
+});
