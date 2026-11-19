@@ -14,9 +14,11 @@ const schema = z.strictObject({
   issuer,
   audience: resource,
   clientId: z.uuid(),
+  /** Further approved OAuth clients (e.g. Claude). Same owner, issuer and audience rules. */
+  additionalClientIds: z.array(z.uuid()).max(4).default([]),
   signingAlgorithm: z.enum(['ES256', 'RS256']).default('ES256'),
   ownerUserId: z.uuid(),
-});
+}).refine(value => new Set([value.clientId, ...value.additionalClientIds]).size === 1 + value.additionalClientIds.length);
 
 export type OAuthConfig = Readonly<z.infer<typeof schema>>;
 
@@ -42,6 +44,7 @@ export function loadOAuthConfig(env: Readonly<Record<string, string | undefined>
     issuer: env.MCP_OAUTH_ISSUER,
     audience: env.MCP_OAUTH_AUDIENCE,
     clientId: env.MCP_OAUTH_CLIENT_ID,
+    additionalClientIds: env.MCP_CLAUDE_OAUTH_CLIENT_ID === undefined ? [] : [env.MCP_CLAUDE_OAUTH_CLIENT_ID],
     signingAlgorithm: env.MCP_OAUTH_SIGNING_ALGORITHM,
     ownerUserId: env.MCP_OWNER_USER_ID,
   });
@@ -74,8 +77,21 @@ const webSchema = z.strictObject({
   }),
   ownerId: z.uuid(),
   clientId: z.uuid(),
-});
+  claudeClientId: z.uuid().optional(),
+}).refine(value => value.claudeClientId !== value.clientId);
 export type SupabaseWebConfig = Readonly<z.infer<typeof webSchema>>;
+
+/** Claude's documented connector callbacks (claude.com is announced as a future host). */
+export const CLAUDE_OAUTH_CALLBACKS = Object.freeze(['https://claude.ai/api/mcp/auth_callback', 'https://claude.com/api/mcp/auth_callback'] as const);
+
+export type ApprovedClient = Readonly<{ id: string; name: 'ChatGPT' | 'Claude'; callbacks: readonly string[] }>;
+
+/** Each approved client is pinned to its own exact callback URLs. */
+export function approvedClients(config: SupabaseWebConfig): readonly ApprovedClient[] {
+  const clients: ApprovedClient[] = [{ id: config.clientId, name: 'ChatGPT', callbacks: [config.callbackUri] }];
+  if (config.claudeClientId) clients.push({ id: config.claudeClientId, name: 'Claude', callbacks: CLAUDE_OAUTH_CALLBACKS });
+  return Object.freeze(clients.map(client => Object.freeze(client)));
+}
 
 /** Server-only web configuration is independent of experiment activation. */
 export function loadSupabaseWebConfig(env: Readonly<Record<string, string | undefined>>): SupabaseWebConfig {
@@ -83,7 +99,8 @@ export function loadSupabaseWebConfig(env: Readonly<Record<string, string | unde
   const result = webSchema.safeParse({ supabaseUrl: env.SUPABASE_URL,
     publishableKey: env.SUPABASE_PUBLISHABLE_KEY, origin: env.APP_ORIGIN,
     callbackUri: env.CHATGPT_OAUTH_REDIRECT_URI,
-    ownerId: env.MCP_OWNER_USER_ID, clientId: env.MCP_OAUTH_CLIENT_ID });
+    ownerId: env.MCP_OWNER_USER_ID, clientId: env.MCP_OAUTH_CLIENT_ID,
+    ...(env.MCP_CLAUDE_OAUTH_CLIENT_ID === undefined ? {} : { claudeClientId: env.MCP_CLAUDE_OAUTH_CLIENT_ID }) });
   if (!result.success || env.MCP_OAUTH_ISSUER !== `${result.data.supabaseUrl}/auth/v1` ||
       env.MCP_OAUTH_AUDIENCE !== `${result.data.origin}/mcp`) throw new OAuthConfigurationError();
   return Object.freeze(result.data);

@@ -271,3 +271,30 @@ test('scope-less OAuth issuance and refresh retain every access-token security b
     await assert.rejects(h.verifier.verify(forged), failure('invalid_token'));
   }
 });
+
+test('an additional approved client (Claude) verifies as the same owner; unknown clients and other owners stay denied', async () => {
+  const claude = '00000000-0000-4000-8000-000000000006';
+  assert.throws(() => loadOAuthConfig({ ...env, MCP_CLAUDE_OAUTH_CLIENT_ID: 'not-a-uuid' }), OAuthConfigurationError);
+  assert.throws(() => loadOAuthConfig({ ...env, MCP_CLAUDE_OAUTH_CLIENT_ID: env.MCP_OAUTH_CLIENT_ID }), OAuthConfigurationError);
+  assert.throws(() => loadOAuthConfig({ ...env, NEXT_PUBLIC_MCP_OAUTH_CLAUDE: claude }), OAuthConfigurationError);
+  const multi = loadOAuthConfig({ ...env, MCP_CLAUDE_OAUTH_CLIENT_ID: claude });
+  assert.deepEqual(multi.additionalClientIds, [claude]);
+  const fetcher: typeof fetch = async input => {
+    const url = String(input);
+    if (url === `${config.issuer}/.well-known/openid-configuration`) return Response.json(metadata);
+    if (url === metadata.jwks_uri) return Response.json({ keys: [publicKey] });
+    throw new Error('Unexpected URL');
+  };
+  const auth = createOwnerAuthentication(multi, fetcher);
+  const headers = (value: string) => new Headers({ authorization: `Bearer ${value}` });
+  const fromClaude = await auth.authenticate(headers(await token({ client_id: claude })), ['entries:write']);
+  assert.equal(fromClaude.userId, config.ownerUserId);
+  assert.equal(fromClaude.identity.clientId, claude);
+  assert.equal((await auth.authenticate(headers(await token()), ['tracker:read'])).identity.clientId, config.clientId);
+  await assert.rejects(auth.authenticate(headers(await token({ client_id: '00000000-0000-4000-8000-000000000003' })), ['tracker:read']), failure('access_denied'));
+  await assert.rejects(auth.authenticate(headers(await token({ client_id: claude, sub: '00000000-0000-4000-8000-000000000003' })), ['tracker:read']), failure('access_denied'));
+  await assert.rejects(auth.authenticate(headers(await token({ client_id: claude, aud: 'authenticated' })), ['tracker:read']), failure('invalid_token'));
+  // Without the Claude client configured, its tokens are denied.
+  const single = createOwnerAuthentication(config, fetcher);
+  await assert.rejects(single.authenticate(headers(await token({ client_id: claude })), ['tracker:read']), failure('access_denied'));
+});

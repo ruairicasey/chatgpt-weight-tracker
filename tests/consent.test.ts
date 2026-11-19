@@ -157,3 +157,32 @@ test('pinned Supabase SDK returns raw consent details and the already-consented 
   assert.throws(() => requireConsentDetails(repeated.data, config, id));
   assert(paths.includes(`POST /auth/v1/oauth/authorizations/${id}/consent`));
 });
+
+test('Claude consent is pinned to Claude callbacks; clients cannot borrow each other\'s callbacks', async () => {
+  const claude = '00000000-0000-4000-8000-000000000006';
+  assert.throws(() => loadSupabaseWebConfig({ ...env, MCP_CLAUDE_OAUTH_CLIENT_ID: env.MCP_OAUTH_CLIENT_ID }));
+  assert.throws(() => loadSupabaseWebConfig({ ...env, MCP_CLAUDE_OAUTH_CLIENT_ID: 'nope' }));
+  const multi = loadSupabaseWebConfig({ ...env, MCP_CLAUDE_OAUTH_CLIENT_ID: claude });
+  const claudeDetails = { ...details, client: { id: claude }, redirect_uri: 'https://claude.ai/api/mcp/auth_callback', scope: 'openid offline_access' };
+  assert.equal(requireConsentDetails(claudeDetails, multi, id).name, 'Claude');
+  assert.equal(requireConsentDetails({ ...claudeDetails, redirect_uri: 'https://claude.com/api/mcp/auth_callback' }, multi, id).name, 'Claude');
+  assert.equal(requireConsentDetails(details, multi, id).name, 'ChatGPT');
+  // Cross-borrowed or unknown callbacks and clients are denied.
+  assert.throws(() => requireConsentDetails({ ...claudeDetails, redirect_uri: config.callbackUri }, multi, id));
+  assert.throws(() => requireConsentDetails({ ...details, redirect_uri: 'https://claude.ai/api/mcp/auth_callback' }, multi, id));
+  assert.throws(() => requireConsentDetails({ ...claudeDetails, redirect_uri: 'https://claude.ai/api/mcp/other' }, multi, id));
+  assert.throws(() => requireConsentDetails(claudeDetails, config, id)); // not configured
+  assert.throws(() => requireConsentDetails({ ...claudeDetails, user: { id: claude } }, multi, id));
+  const ok = 'https://claude.ai/api/mcp/auth_callback?code=synthetic&state=synthetic';
+  assert.throws(() => consentRedirect(ok, config));
+  assert.equal(consentRedirect(ok, multi), ok);
+  for (const url of ['https://claude.ai.evil.example/api/mcp/auth_callback', 'https://claude.ai/api/mcp/auth_callback#x', 'https://u:p@claude.ai/api/mcp/auth_callback']) assert.throws(() => consentRedirect(url, multi));
+  const provider = (redirect: string) => ({
+    async owner() { return { id: multi.ownerId, is_anonymous: false }; },
+    async details() { return claudeDetails; },
+    async decide() { return redirect; },
+  });
+  assert.equal(await executeConsentDecision({ origin: multi.origin, id, decision: 'approve' }, multi, provider(ok)), ok);
+  // Claude's request cannot be redirected to ChatGPT's callback.
+  await assert.rejects(executeConsentDecision({ origin: multi.origin, id, decision: 'approve' }, multi, provider(`${config.callbackUri}?code=x`)));
+});
